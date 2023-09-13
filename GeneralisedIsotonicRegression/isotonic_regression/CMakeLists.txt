@@ -21,4 +21,10 @@ target_link_libraries(
     highs::highs
 )
 
+target_compile_options(
+    isotonic_regression
+    PRIVATE
+    ${TARGET_COMPILE_OPTIONS}
+)
+
 set_property(TARGET isotonic_regression PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)

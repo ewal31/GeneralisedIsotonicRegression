@@ -14,7 +14,7 @@ target_link_libraries(
 target_compile_options(
     ${EXECUTABLE_NAME}
     PRIVATE
-    -march=native
+    ${TARGET_COMPILE_OPTIONS}
 )
 
 set_property(TARGET ${EXECUTABLE_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)

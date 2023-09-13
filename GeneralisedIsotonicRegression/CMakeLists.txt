@@ -17,6 +17,11 @@ set(
     -Wpedantic
 )
 
+set(
+    TARGET_COMPILE_OPTIONS
+    -march=native
+)
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -58,8 +63,14 @@ FetchContent_MakeAvailable(
 )
 
 add_subdirectory(isotonic_regression)
-add_subdirectory(example)
-add_subdirectory(tests)
+
+if (BUILD_GIR_EXAMPLES)
+    add_subdirectory(example)
+endif (BUILD_GIR_EXAMPLES)
+
+if (BUILD_GIR_TESTS)
+    add_subdirectory(tests)
+endif (BUILD_GIR_TESTS)
 
 # Just Clang and GNU
 add_compile_options("-fno-omit-frame-pointer")

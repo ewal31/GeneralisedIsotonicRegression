@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Sparse>
 
 #include <algorithm>
 #include <utility>
@@ -51,16 +52,16 @@ argpartition(const Eigen::VectorX<bool>& solution);
 
 template<typename V>
 std::pair<V, size_t>
-find_first_max(Eigen::VectorX<V> vec) {
+argmax(Eigen::VectorX<V> vec) {
     auto max_val = vec.maxCoeff();
     auto location = std::find(vec.begin(), vec.end(), max_val);
     return std::make_pair(max_val, std::distance(vec.begin(), location));
 }
 
 template<typename V, typename UnaryPredicate>
-Eigen::VectorXi
-find_where(Eigen::VectorX<V> vec, UnaryPredicate p) {
-    Eigen::VectorXi idxs = Eigen::VectorXi::LinSpaced(vec.rows(), 0, vec.rows() - 1);
+VectorXu
+find(Eigen::VectorX<V> vec, UnaryPredicate p) {
+    VectorXu idxs = VectorXu::LinSpaced(vec.rows(), 0, vec.rows() - 1);
     auto partition_end = std::stable_partition(idxs.begin(), idxs.end(), p);
     idxs.conservativeResize(std::distance(idxs.begin(), partition_end));
     return idxs;

@@ -8,6 +8,24 @@
 
 #include "utility.h"
 
+
+enum class LossFunction {
+    L2
+};
+
+double calculate_loss_estimator(
+    const LossFunction loss,
+    const Eigen::VectorXd& vals
+);
+
+Eigen::VectorXd calculate_loss_derivative(
+    const LossFunction loss,
+    const double loss_estimator,
+    const Eigen::VectorXd& vals
+);
+
+Eigen::VectorXd normalise(const Eigen::VectorXd& loss_derivative);
+
 std::pair<Eigen::MatrixXd, Eigen::VectorXd>
 generate_monotonic_points(
     size_t total,
@@ -53,7 +71,7 @@ std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency(const Eigen::MatrixX<V>& points) {
     size_t total_points = points.rows();
     auto sorted_idxs = argsort(points);
-    Eigen::SparseMatrix<bool> adjacency(total_points, total_points); // Column Major
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
     Eigen::VectorXi degree = Eigen::VectorXi::Zero(total_points);
     Eigen::MatrixX<V> sorted_points = points(sorted_idxs, Eigen::all).transpose();
     Eigen::VectorX<bool> is_predecessor = Eigen::VectorX<bool>::Zero(total_points);
@@ -94,7 +112,7 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
     auto degree_idxs = argsort(degree);
 
     // create a copy of adjacency reordered to be the same order as degree_idxs.
-    Eigen::SparseMatrix<bool> adjacency_ordered(total_points, total_points);
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency_ordered(total_points, total_points);
     adjacency_ordered.reserve(
         Eigen::VectorXi::Constant(total_points, degree.maxCoeff()));
 
@@ -127,5 +145,25 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
         std::move(ind_original),
         std::move(ind_new));
 }
+
+Eigen::SparseMatrix<int>
+adjacency_to_LP_standard_form(
+    const Eigen::SparseMatrix<bool>& adjacency_matrix
+);
+
+Eigen::VectorX<bool>
+minimum_cut(
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const Eigen::VectorXd loss_gradient, // z in the paper
+    const VectorXu idxs
+);
+
+std::pair<VectorXu, Eigen::VectorXd>
+generalised_isotonic_regression(
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const Eigen::VectorXd& y,
+    const LossFunction loss_function,
+    const uint16_t max_iterations = 0
+);
 
 void run();

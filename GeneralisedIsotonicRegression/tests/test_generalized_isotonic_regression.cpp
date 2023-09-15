@@ -43,6 +43,173 @@ void REQUIRE_EQUAL(const Eigen::SparseMatrix<V>& a, const Eigen::SparseMatrix<V>
     }
 }
 
+TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
+    SECTION( "adjacency matrix (monotonic 1)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 1) = true;
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(1, 3) = true;
+        adjacency_matrix.insert(2, 3) = true;
+        adjacency_matrix.insert(3, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 1, 1, 3, 5;
+        REQUIRE( is_monotonic(adjacency_matrix, y) );
+    }
+
+    SECTION( "adjacency matrix (monotonic 2)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 1) = true;
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(1, 3) = true;
+        adjacency_matrix.insert(2, 3) = true;
+        adjacency_matrix.insert(3, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 2, 1, 2, 5;
+        REQUIRE( is_monotonic(adjacency_matrix, y) );
+    }
+
+    SECTION( "adjacency matrix (not monotonic 1)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 1) = true;
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(1, 3) = true;
+        adjacency_matrix.insert(2, 3) = true;
+        adjacency_matrix.insert(3, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 1, 1, 3, 2.9;
+        REQUIRE( !is_monotonic(adjacency_matrix, y) );
+    }
+
+    SECTION( "adjacency matrix (not monotonic 2)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 1) = true;
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(1, 3) = true;
+        adjacency_matrix.insert(2, 3) = true;
+        adjacency_matrix.insert(3, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 1, 1, 0.9, 5;
+        REQUIRE( !is_monotonic(adjacency_matrix, y) );
+    }
+
+    SECTION( "points (monotonic 1)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::MatrixX<double> points(5, 2);
+        points << 0, 0,
+                  1, 2,
+                  2, 1,
+                  3, 3,
+                  4, 4;
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 1, 1, 3, 5;
+        REQUIRE( is_monotonic(points, y) );
+    }
+
+    SECTION( "points (monotonic 2)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::MatrixX<double> points(5, 2);
+        points << 0, 0,
+                  1, 2,
+                  2, 1,
+                  3, 3,
+                  4, 4;
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 2, 1, 3, 5;
+        REQUIRE( is_monotonic(points, y) );
+    }
+
+    SECTION( "points (not monotonic 1)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::MatrixX<double> points(5, 2);
+        points << 0, 0,
+                  1, 2,
+                  2, 1,
+                  3, 3,
+                  4, 4;
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 1, 1, 3, 2.9;
+        REQUIRE( !is_monotonic(points, y) );
+    }
+
+    SECTION( "points (not monotonic 2)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::MatrixX<double> points(5, 2);
+        points << 0, 0,
+                  1, 2,
+                  2, 1,
+                  3, 3,
+                  4, 4;
+
+        Eigen::VectorX<double> y(5);
+        y << 0, 1, 1, 0.9, 5;
+        REQUIRE( !is_monotonic(points, y) );
+    }
+}
+
+
 TEST_CASE( "generate_monotonic_points", "[isotonic_regression]" ) {
     SECTION( "1-dimensional" ) {
         auto [X, y] = generate_monotonic_points(5, 0.1, 1);

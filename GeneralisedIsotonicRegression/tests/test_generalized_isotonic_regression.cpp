@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdlib>
 
 template<typename V>
 void REQUIRE_EQUAL(const Eigen::VectorX<V>& a, const Eigen::VectorX<V>& b) {
@@ -10,6 +11,15 @@ void REQUIRE_EQUAL(const Eigen::VectorX<V>& a, const Eigen::VectorX<V>& b) {
     REQUIRE( equal_sizes );
 
     REQUIRE( (a.array() == b.array()).all() );
+}
+
+template<typename V>
+void REQUIRE_EQUAL(const Eigen::MatrixX<V>& a, const Eigen::MatrixX<V>& b) {
+    bool equal_sizes = a.rows() == b.rows() && a.cols() == b.cols();
+
+    REQUIRE( equal_sizes );
+
+    REQUIRE( (a.cwiseEqual(b)).all() );
 }
 
 template<typename V>
@@ -165,6 +175,9 @@ TEST_CASE( "points_to_adjacency", "[isotonic_regression]" ) {
 }
 
 TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
+    VectorXu considered_idxs(5);
+    considered_idxs << 0, 1, 2, 3, 4;
+
     SECTION( "Simple Case 1" ) {
         /*
          * . x . . .
@@ -203,7 +216,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(4, 13) = -1;
         expected.makeCompressed();
 
-        auto result = adjacency_to_LP_standard_form(adjacency_matrix);
+        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
         REQUIRE_EQUAL(expected, result);
     }
@@ -257,9 +270,139 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(4, 14) = -1;
         expected.makeCompressed();
 
-        auto network_flow_matrix = adjacency_to_LP_standard_form(adjacency_matrix);
+        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
-        REQUIRE_EQUAL(expected, network_flow_matrix);
+        REQUIRE_EQUAL(expected, result);
+    }
+
+    SECTION( "Simple Case 2 (Subset 1)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 1) = true;
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(1, 3) = true;
+        adjacency_matrix.insert(2, 3) = true;
+        adjacency_matrix.insert(3, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        VectorXu considered_idxs(3);
+        considered_idxs << 0, 1, 2;
+
+        /*
+         * |source |  sink  | network |
+         *  1  0  0 -1  0  0  1  1
+         *  0  1  0  0 -1  0 -1  0
+         *  0  0  1  0  0 -1  0 -1
+         */
+        Eigen::SparseMatrix<int> expected(3, 8);
+        for (int i = 0; i < 3; ++i) {
+            expected.insert(i, i) = 1;
+            expected.insert(i, i + 3) = -1;
+        }
+        expected.insert(0, 6) =  1;
+        expected.insert(1, 6) =  -1;
+        expected.insert(0, 7) =  1;
+        expected.insert(2, 7) =  -1;
+        expected.makeCompressed();
+
+        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+
+        REQUIRE_EQUAL(expected, result);
+    }
+
+    SECTION( "Simple Case 2 (Subset 2)" ) {
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 1) = true;
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(1, 3) = true;
+        adjacency_matrix.insert(2, 3) = true;
+        adjacency_matrix.insert(3, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        VectorXu considered_idxs(3);
+        considered_idxs << 0, 2, 3;
+
+        /*
+         * |source |  sink  | network |
+         *  1  0  0 -1  0  0  1  1
+         *  0  1  0  0 -1  0 -1  0
+         *  0  0  1  0  0 -1  0 -1
+         */
+        Eigen::SparseMatrix<int> expected(3, 8);
+        for (int i = 0; i < 3; ++i) {
+            expected.insert(i, i) = 1;
+            expected.insert(i, i + 3) = -1;
+        }
+        expected.insert(0, 6) =  1;
+        expected.insert(1, 6) =  -1;
+        expected.insert(1, 7) =  1;
+        expected.insert(2, 7) =  -1;
+        expected.makeCompressed();
+
+        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+
+        REQUIRE_EQUAL(expected, result);
+    }
+
+    SECTION( "Simple Case 3" ) {
+        /*
+         * . . x x .
+         * . . . . x
+         * . . . . .
+         * . . . . .
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> adjacency_matrix(5, 5);
+        adjacency_matrix.insert(0, 2) = true;
+        adjacency_matrix.insert(0, 3) = true;
+        adjacency_matrix.insert(1, 4) = true;
+        adjacency_matrix.makeCompressed();
+
+        /*
+         * network by column:
+         *  - node 1 to node 2
+         *  - node 1 to node 3
+         *  - node 2 to node 4
+         *  - node 3 to node 4
+         *  - node 4 to node 5
+         * which correspond to the adjacency matrix above
+         *
+         * |   source    |     sink     | network |
+         *  1  0  0  0  0 -1  0  0  0  0  1  1  0
+         *  0  1  0  0  0  0 -1  0  0  0  0  0  1
+         *  0  0  1  0  0  0  0 -1  0  0 -1  0  0
+         *  0  0  0  1  0  0  0  0 -1  0  0 -1  0
+         *  0  0  0  0  1  0  0  0  0 -1  0  0 -1
+         */
+        Eigen::SparseMatrix<int> expected(5, 13);
+        for (int i = 0; i < 5; ++i) {
+            expected.insert(i, i) = 1;
+            expected.insert(i, i + 5) = -1;
+        }
+        expected.insert(0, 10) =  1;
+        expected.insert(2, 10) = -1;
+        expected.insert(0, 11) =  1;
+        expected.insert(3, 11) = -1;
+        expected.insert(1, 12) =  1;
+        expected.insert(4, 12) = -1;
+        expected.makeCompressed();
+
+        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+
+        REQUIRE_EQUAL(expected, result);
     }
 }
 
@@ -356,7 +499,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
 
     SECTION( "Index Subset 1" ) {
         Eigen::VectorXd z(5); // y = 1, 1, 2, 2, 2;
-        z << -1, -1, 0.667, 0.667, 0.667;
+        z << -1, 0.667, 0.667;
 
         VectorXu idxs(3);
         idxs << 1, 2, 3;
@@ -371,7 +514,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
 
     SECTION( "Index Subset 2" ) {
         Eigen::VectorXd z(5); // y = 1, 1, 2, 2, 2;
-        z << -1, -1, 0.667, 0.667, 0.667;
+        z << 0.667, 0.667, 0.667;
 
         VectorXu idxs(3);
         idxs << 2, 3, 4;
@@ -405,7 +548,7 @@ TEST_CASE( "generalised_isotonic_regression", "[isotonic_regression]" ) {
         y << 1, 1, 3, 5, 5;
 
         VectorXu expected_groups(5);
-        expected_groups << 1, 1, 2, 3, 3;
+        expected_groups << 0, 0, 1, 2, 2;
 
         Eigen::VectorXd expected_y_fit(5);
         expected_y_fit << 1, 1, 3, 5, 5;
@@ -418,4 +561,103 @@ TEST_CASE( "generalised_isotonic_regression", "[isotonic_regression]" ) {
         REQUIRE_EQUAL(expected_groups, groups);
         REQUIRE_EQUAL(expected_y_fit, y_fit);
     };
+}
+
+TEST_CASE( "full example", "[isotonic_regression]" ) {
+    Eigen::MatrixXd points(5, 2);
+    points << 0.762495,  0.392963,
+              0.522416,  0.486052,
+              0.796809,  0.0152406,
+              0.979002,  0.271266,
+              0.0711248, 0.310313;
+
+    Eigen::VectorXd y(5);
+    y << 0.301295,
+         0.254428,
+         0.0120925,
+         0.265759,
+         0.0222442;
+
+    auto [adjacency_matrix, idx_original, idx_new] =
+        points_to_adjacency(points);
+
+    /*
+        * . . x x .
+        * . . . . x
+        * . . . . .
+        * . . . . .
+        * . . . . .
+        */
+    Eigen::SparseMatrix<bool> expected_adjacency_matrix(5, 5);
+    expected_adjacency_matrix.insert(0, 2) = true;
+    expected_adjacency_matrix.insert(0, 3) = true;
+    expected_adjacency_matrix.insert(1, 4) = true;
+    expected_adjacency_matrix.makeCompressed();
+
+    REQUIRE_EQUAL(expected_adjacency_matrix, adjacency_matrix);
+
+    Eigen::MatrixXd sorted_points = points(idx_new, Eigen::all);
+    Eigen::MatrixXd expected_sorted_points(5, 2);
+    expected_sorted_points << 0.0711248, 0.310313,
+                              0.796809,  0.0152406,
+                              0.522416,  0.486052,
+                              0.762495,  0.392963,
+                              0.979002,  0.271266;
+
+    REQUIRE_EQUAL(expected_sorted_points, sorted_points);
+
+    Eigen::VectorXd sorted_y = y(idx_new);
+    Eigen::VectorXd expected_sorted_y(5);
+    expected_sorted_y << 0.0222442,
+                         0.0120925,
+                         0.254428,
+                         0.301295,
+                         0.265759;
+
+    REQUIRE_EQUAL(expected_sorted_y, sorted_y);
+
+    auto [groups, y_fit] = generalised_isotonic_regression(
+        adjacency_matrix,
+        y(idx_new),
+        LossFunction::L2);
+
+    VectorXu expected_groups(5);
+    expected_groups << 0, 1, 2, 3, 4;
+
+    REQUIRE_EQUAL(expected_groups, groups);
+    REQUIRE_EQUAL(expected_sorted_y, y_fit);
+
+    REQUIRE( is_monotonic(sorted_points, y_fit) );
+    REQUIRE( is_monotonic(adjacency_matrix, y_fit) );
+}
+
+TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
+    for (size_t iteration = 0; iteration < 10; ++iteration) {
+        size_t dimensions = std::rand() % 10;
+
+        auto [X, y] = generate_monotonic_points(1000, 0.01, dimensions);
+
+        REQUIRE( X.rows() == y.rows() );
+        REQUIRE( X.cols() == dimensions );
+        REQUIRE( y.cols() == 1 );
+
+        auto [adjacency_matrix, idx_original, idx_new] =
+            points_to_adjacency(X);
+
+        REQUIRE( X.rows() == adjacency_matrix.rows() );
+        REQUIRE( X.rows() == adjacency_matrix.cols() );
+        REQUIRE( X.rows() == idx_original.rows() );
+        REQUIRE( X.rows() == idx_new.rows() );
+
+        Eigen::MatrixXd sorted_points = X(idx_new, Eigen::all);
+        Eigen::VectorXd sorted_ys = y(idx_new);
+
+        auto [groups, y_fit] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            LossFunction::L2);
+
+        REQUIRE( is_monotonic(sorted_points, y_fit) );
+        REQUIRE( is_monotonic(adjacency_matrix, y_fit) );
+    }
 }

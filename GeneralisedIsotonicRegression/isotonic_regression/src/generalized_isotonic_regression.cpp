@@ -64,13 +64,39 @@ generate_monotonic_points(size_t total, double sigma, size_t dimensions) {
     return std::make_pair(std::move(points), std::move(regressed_values));
 }
 
+uint16_t
+constraints_count(
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const VectorXu& considered_idxs
+) {
+    // The function assumes there are no 0's stored in the adjacency_matrix;
+    uint16_t total_constraints = 0;
+
+    for (size_t j : considered_idxs) {
+        for (Eigen::SparseMatrix<bool>::InnerIterator it(adjacency_matrix, j); it; ++it) {
+            total_constraints += std::binary_search(considered_idxs.begin(), considered_idxs.end(), it.row());
+        }
+    }
+
+    return total_constraints;
+}
+
 Eigen::SparseMatrix<int>
 adjacency_to_LP_standard_form(
-    const Eigen::SparseMatrix<bool>& adjacency_matrix
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const VectorXu& considered_idxs
 ) {
-    uint16_t total_constraints = adjacency_matrix.nonZeros();
-    uint16_t total_observations = adjacency_matrix.rows();
-    uint16_t columns = 2 * total_observations + total_constraints;
+    // The function assumes there are no 0's stored in the adjacency_matrix;
+    // and that considered_idxs is sorted
+
+    // std::cout << "A:\n" << adjacency_matrix << std::endl;
+
+    uint16_t total_constraints = constraints_count(adjacency_matrix, considered_idxs);
+
+    const uint16_t total_observations = considered_idxs.rows();
+    const uint16_t columns = 2 * total_observations + total_constraints;
+
+    // fmt::println("total_observations: {}, total_constraints: {}, columns: {}", total_observations, total_constraints, columns);
 
     VectorXu to_reserve(columns);
     for (int j = 0; j < 2 * total_observations; ++j) {
@@ -88,14 +114,20 @@ adjacency_to_LP_standard_form(
     int idx = 0;
     for (int j = 0; j < total_observations; ++j) {
         for (
-            Eigen::SparseMatrix<bool>::InnerIterator it(adjacency_matrix, j);
+            Eigen::SparseMatrix<bool>::InnerIterator it(adjacency_matrix, considered_idxs(j));
             it;
             ++it
         ) {
             // add edges
-            standard_form.insert(it.row(), 2 * total_observations + idx) = 1;
-            standard_form.insert(it.col(), 2 * total_observations + idx) = -1;
-            ++idx;
+            // standard_form.insert(it.row(), 2 * total_observations + idx) = 1;
+            // standard_form.insert(it.col(), 2 * total_observations + idx) = -1;
+
+            auto row_idx = std::find(considered_idxs.begin(), considered_idxs.end(), it.row());
+            if (row_idx != considered_idxs.end()) {
+                standard_form.insert(std::distance(considered_idxs.begin(), row_idx), 2 * total_observations + idx) = 1; // row
+                standard_form.insert(j, 2 * total_observations + idx) = -1;       // col
+                ++idx;
+            }
         }
 
         // Add slack/surplus variables (source and sink)
@@ -141,12 +173,12 @@ Eigen::VectorX<bool>
 minimum_cut(
     const Eigen::SparseMatrix<bool>& adjacency_matrix,
     const Eigen::VectorXd loss_gradient, // z in the paper
-    const VectorXu idxs
+    const VectorXu considered_idxs // TODO take this out and just pass the standard form so it is more consistent
 ) {
-    const uint16_t total_observations = idxs.rows();
+    const uint16_t total_observations = considered_idxs.rows();
 
     // already optimal
-    if (loss_gradient(idxs).isApproxToConstant(0)) {
+    if (loss_gradient.isApproxToConstant(0)) {
         return Eigen::VectorX<bool>::Constant(total_observations, true);
     }
 
@@ -157,11 +189,9 @@ minimum_cut(
      *
      */
 
-    // TODO I need to think about this a bit more, but I think the subsets should always be consecutive
-    // and this is therefore okay
-    const auto A = adjacency_to_LP_standard_form(
-        adjacency_matrix.block(
-            idxs(0), idxs(0), total_observations, total_observations));
+    const auto A = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+
+    // std::cout << "A:\n" << A << std::endl;
 
     const uint16_t total_constraints = A.cols() - 2 * total_observations;
 
@@ -169,7 +199,11 @@ minimum_cut(
     for (size_t i = 0; i < total_observations * 2; ++i) b[i] = 1;
     for (size_t i = 0; i < total_constraints; ++i) b[2 * total_observations + i] = 0;
 
-    const std::vector<double> c(loss_gradient(idxs).begin(), loss_gradient(idxs).end());
+    std::vector<double> c(loss_gradient.begin(), loss_gradient.end());
+    // std::transform(considered_idxs.begin(), considered_idxs.end(), c.begin(),
+    //     [&loss_gradient](auto idx) {
+    //         return loss_gradient(idx);
+    //     });
 
     const double infinity = 1.0e30; // Highs treats large numbers as infinity
     HighsModel model;
@@ -224,6 +258,7 @@ minimum_cut(
 
     // Could also get solution from slack and surplus by looking at the
     // weight distributions either side of 0 and finding the middle point
+    // but will this still work with more than one dimension??
     // Eigen::VectorXd x =
     //     Eigen::VectorXd::Map(&highs.getSolution().col_value[total_observations], total_observations).array() +
     //     Eigen::VectorXd::Map(&highs.getSolution().col_value[0], total_observations).array();
@@ -231,6 +266,7 @@ minimum_cut(
     // const double middle_point = x(x.rows() - 1) / 2;
 
     // fmt::println("colsol:\n{}", highs.getSolution().col_value);
+    // fmt::println("rowdualsol:\n{}", highs.getSolution().row_dual);
 
     // Eigen::VectorX<bool> solution(total_observations);
     // size_t i = 0;
@@ -275,32 +311,66 @@ generalised_isotonic_regression(
                 return idx == groups(i);
             });
 
+        // std::cout << "Iteration: " << iteration << std::endl;
+
         const double estimator = calculate_loss_estimator(loss_function, y(considered_idxs));
         const auto derivative = calculate_loss_derivative(loss_function, estimator, y(considered_idxs));
-        const auto solution =  minimum_cut(adjacency_matrix, derivative, considered_idxs);
-        auto [left, right] = argpartition(solution);
 
-        if (right.rows() == considered_idxs.rows()) {
+        // std::cout << "considered_idxs:\n" << considered_idxs.rows() << std::endl;
+        // std::cout << "estimator:\n" << estimator << std::endl;
+        // std::cout << "derivative:\n" << derivative.rows() << std::endl;
+
+        // bool identical_ys = (y(considered_idxs).array() == y(considered_idxs(0))).all();
+        bool zero_loss = derivative.isApproxToConstant(0);
+        bool no_constraints = constraints_count(adjacency_matrix, considered_idxs) == 0;
+
+        // fmt::println("zero_loss {}, no_constraints {}", zero_loss, no_constraints);
+
+        if (zero_loss) {
             group_loss(considered_idxs).array() = sentinal;
-        } else {
-            group_loss(considered_idxs).array() =
-                calculate_loss_derivative(loss_function, estimator, y(considered_idxs(right))).sum() -
-                    calculate_loss_derivative(loss_function, estimator, y(considered_idxs(left))).sum();
+            y_fit(considered_idxs).array() = estimator;
 
-            y_fit(considered_idxs(left)).array() = calculate_loss_estimator(loss_function, y(considered_idxs(left)));
-            y_fit(considered_idxs(right)).array() = calculate_loss_estimator(loss_function, y(considered_idxs(right)));
-            groups(considered_idxs(left)).array() = ++group_count;
-            groups(considered_idxs(right)).array() = ++group_count;
+        } else if (no_constraints) {
+            group_loss(considered_idxs).array() = sentinal;
+
+            for (auto idx: considered_idxs) {
+                y_fit(idx) = calculate_loss_estimator(loss_function, y(idx, Eigen::all));
+                y_fit(idx) = calculate_loss_estimator(loss_function, y(idx, Eigen::all));
+                groups(idx) = ++group_count;
+            }
+
+        } else {
+            const auto solution = minimum_cut(adjacency_matrix, derivative, considered_idxs);
+            auto [left, right] = argpartition(solution);
+
+            // std::cout << "solution:\n" << solution << std::endl;
+            // std::cout << "left:\n" << left << std::endl;
+            // std::cout << "right:\n" << right << std::endl;
+            // std::cout << "left:\n" << left.rows() << std::endl;
+            // std::cout << "right:\n" << right.rows() << std::endl;
+
+            if (left.rows() == 0 || right.rows() == 0) {
+                group_loss(considered_idxs).array() = sentinal;
+                y_fit(considered_idxs).array() = estimator;
+
+            } else {
+                group_loss(considered_idxs).array() =
+                    calculate_loss_derivative(loss_function, estimator, y(considered_idxs(right))).sum() -
+                        calculate_loss_derivative(loss_function, estimator, y(considered_idxs(left))).sum();
+
+                y_fit(considered_idxs(left)).array() = calculate_loss_estimator(loss_function, y(considered_idxs(left)));
+                y_fit(considered_idxs(right)).array() = calculate_loss_estimator(loss_function, y(considered_idxs(right)));
+                groups(considered_idxs(right)).array() = ++group_count;
+            }
         }
 
-        std::cout << "Iteration: " << iteration << std::endl;
-        std::cout << "group_loss:\n" << group_loss << std::endl;
-        std::cout << "y_fit:\n" << y_fit << std::endl;
-        std::cout << "groups:\n" << groups << "\n" << std::endl;
+        // std::cout << "group_loss:\n" << group_loss << std::endl;
+        // std::cout << "y_fit:\n" << y_fit << std::endl;
+        // std::cout << "groups:\n" << groups << "\n" << std::endl;
     }
 
     // Renumber from 1
-    group_count = 1;
+    group_count = 0;
     for (size_t i = 0; i < groups.rows() - 1; ++i) {
         auto current = groups(i);
         groups(i) = group_count;
@@ -314,31 +384,20 @@ generalised_isotonic_regression(
 void run() {
     auto [X, y] = generate_monotonic_points(5, 0.001, 2);
 
-    // Eigen::MatrixX<uint8_t> X(5, 1);
-    // X << 1,
-    //      2,
-    //      3,
-    //      4,
-    //      5;
-
-    // Eigen::VectorXd y(5);
-    // // regressed_values << 1, 1, 1.2, 1, 1;
-    // y << 1, 1, 3, 5, 5;
-
-    // std::cout << "points:\n" << X << '\n' << std::endl;
-    // std::cout << "regressed_values:\n" << y << '\n' << std::endl;
+    std::cout << "points:\n" << X << '\n' << std::endl;
+    std::cout << "regressed_values:\n" << y << '\n' << std::endl;
 
     auto [adjacency_matrix, idx_original, idx_new] =
         points_to_adjacency(X);
 
     std::cout << "adjacency_matrix:\n" << adjacency_matrix << '\n' << std::endl;
-    // std::cout << "idx_original:\n" << idx_original << '\n' << std::endl;
-    // std::cout << "idx_new:\n" << idx_new << '\n' << std::endl;
+    std::cout << "idx_original:\n" << idx_original << '\n' << std::endl;
+    std::cout << "idx_new:\n" << idx_new << '\n' << std::endl;
     std::cout << "points reordered to adjacency_matrix\n";
     std::cout << X(idx_new, Eigen::all) << "\n" << std::endl;
     std::cout << y(idx_new) << "\n" << std::endl;
 
-    auto [groups, y_fit] = generalised_isotonic_regression(adjacency_matrix, y, LossFunction::L2);
+    auto [groups, y_fit] = generalised_isotonic_regression(adjacency_matrix, y(idx_new), LossFunction::L2);
 
     std::cout << "fit y values:\n" << y_fit << "\n" << std::endl;
 }

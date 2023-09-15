@@ -26,6 +26,50 @@ Eigen::VectorXd calculate_loss_derivative(
 
 Eigen::VectorXd normalise(const Eigen::VectorXd& loss_derivative);
 
+template<typename V>
+bool
+is_monotonic(
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const Eigen::VectorX<V>& y,
+    const double tolerance = 1e-6
+) {
+    for (size_t j = 0; j < adjacency_matrix.cols(); ++j) {
+        for (Eigen::SparseMatrix<bool>::InnerIterator it(adjacency_matrix, j); it; ++it) {
+            if (it.value()) {
+                if ((y(it.row()) - y(it.col())) > tolerance) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+template<typename V, typename K>
+bool
+is_monotonic(
+    const Eigen::MatrixX<V>& points,
+    const Eigen::VectorX<K>& y,
+    const double tolerance = 1e-6
+) {
+    auto sorted_idxs = argsort(points);
+    Eigen::MatrixX<V> sorted_points = points(sorted_idxs, Eigen::all);
+    Eigen::VectorX<V> sorted_y = y(sorted_idxs);
+
+    for (size_t row1 = 1; row1 < y.rows(); ++row1) {
+        for (size_t row2 = 0; row2 < row1; ++row2) {
+            bool is_smaller = (sorted_points(row2, Eigen::all).array() <=
+                    sorted_points(row1, Eigen::all).array()).all();
+            bool within_tolerance = (sorted_y(row2) - sorted_y(row1)) < tolerance;
+
+            if (is_smaller && !within_tolerance) return false;
+        }
+    }
+
+    return true;
+}
+
 std::pair<Eigen::MatrixXd, Eigen::VectorXd>
 generate_monotonic_points(
     size_t total,
@@ -110,6 +154,8 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
     }
 
     auto degree_idxs = argsort(degree);
+    VectorXu rev_degree_idxs(degree_idxs.rows());
+    rev_degree_idxs(degree_idxs) = VectorXu::LinSpaced(degree_idxs.rows(), 0, degree_idxs.rows() - 1);
 
     // create a copy of adjacency reordered to be the same order as degree_idxs.
     Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency_ordered(total_points, total_points);
@@ -123,8 +169,8 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
             ++it
         ) {
             adjacency_ordered.insert(
-                degree_idxs(it.row()),
-                degree_idxs(it.col())) = it.value();
+                rev_degree_idxs(it.row()),
+                rev_degree_idxs(it.col())) = it.value();
         }
     }
     adjacency_ordered.makeCompressed();
@@ -148,7 +194,8 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
 
 Eigen::SparseMatrix<int>
 adjacency_to_LP_standard_form(
-    const Eigen::SparseMatrix<bool>& adjacency_matrix
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const VectorXu& idxs
 );
 
 Eigen::VectorX<bool>

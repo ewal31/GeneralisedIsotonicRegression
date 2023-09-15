@@ -11,19 +11,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(
-    CLANG_COMPILER
-    -Wall
-    -Wextra
-    -Wpedantic
-)
-
-set(
     TARGET_COMPILE_OPTIONS
-    -march=native
+    # -march=native
+    # -O3
+    # -Wall
+    # -Wextra
+    # -Wpedantic
 )
 
 include(FetchContent)
 
+# TODO Only for tests.
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY "https://github.com/catchorg/Catch2"

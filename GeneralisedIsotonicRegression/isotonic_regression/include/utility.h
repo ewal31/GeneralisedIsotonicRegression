@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <utility>
 
-using VectorXu = Eigen::VectorX<size_t>;
 
+using VectorXu = Eigen::VectorX<Eigen::Index>;
 
 template<typename V>
 VectorXu argsort(const Eigen::Matrix<V, Eigen::Dynamic, 1>& vec) {
@@ -35,7 +35,7 @@ VectorXu argsort(const Eigen::Matrix<V, Eigen::Dynamic, Eigen::Dynamic>& mat) {
         idxs.begin(),
         idxs.end(),
         [&mat](const auto i, const auto j){
-            size_t col = 0;
+        Eigen::Index col = 0;
             while (col < mat.cols()) {
                 if ( mat(i, col) != mat(j, col) )
                     return mat(i, col) < mat(j, col);
@@ -53,8 +53,8 @@ argpartition(const Eigen::VectorX<bool>& solution);
 template<typename V>
 std::pair<V, size_t>
 argmax(Eigen::VectorX<V> vec) {
-    auto max_val = vec.maxCoeff();
-    auto location = std::find(vec.begin(), vec.end(), max_val);
+    const auto& max_val = vec.maxCoeff();
+    const auto& location = std::find(vec.begin(), vec.end(), max_val);
     return std::make_pair(max_val, std::distance(vec.begin(), location));
 }
 

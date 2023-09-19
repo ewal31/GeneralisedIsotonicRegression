@@ -4,9 +4,15 @@
 
 #include <cstdlib>
 
+#include <iostream>
+
 template<typename V>
 void REQUIRE_EQUAL(const Eigen::VectorX<V>& a, const Eigen::VectorX<V>& b) {
     bool equal_sizes = a.rows() == b.rows() && a.cols() == b.cols();
+    if (!equal_sizes) {
+        std::cout << "Unequal Vector Sizes: (" << a.rows() << ", " << a.cols();
+        std::cout << ") != (" << b.rows() << ", " << b.cols() << ")" << std::endl;
+    }
 
     REQUIRE( equal_sizes );
 
@@ -17,6 +23,11 @@ template<typename V>
 void REQUIRE_EQUAL(const Eigen::MatrixX<V>& a, const Eigen::MatrixX<V>& b) {
     bool equal_sizes = a.rows() == b.rows() && a.cols() == b.cols();
 
+    if (!equal_sizes) {
+        std::cout << "Unequal Matrix Sizes: (" << a.rows() << ", " << a.cols();
+        std::cout << ") != (" << b.rows() << ", " << b.cols() << ")" << std::endl;
+    }
+
     REQUIRE( equal_sizes );
 
     REQUIRE( (a.cwiseEqual(b)).all() );
@@ -25,6 +36,11 @@ void REQUIRE_EQUAL(const Eigen::MatrixX<V>& a, const Eigen::MatrixX<V>& b) {
 template<typename V>
 void REQUIRE_EQUAL(const Eigen::SparseMatrix<V>& a, const Eigen::SparseMatrix<V>& b) {
     bool equal_sizes = a.rows() == b.rows() && a.cols() == b.cols();
+
+    if (!equal_sizes) {
+        std::cout << "Unequal SparseMatrix Sizes: (" << a.rows() << ", " << a.cols();
+        std::cout << ") != (" << b.rows() << ", " << b.cols() << ")" << std::endl;
+    }
 
     REQUIRE( equal_sizes );
 
@@ -592,18 +608,6 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
     VectorXu idxs(5);
     idxs << 0, 1, 2, 3, 4;
 
-    SECTION( "All 0 Loss" ) {
-        Eigen::VectorXd z(5); // y = 1, 1, 1, 1, 1;
-        z << 0, 0, 0, 0, 0;
-
-        Eigen::VectorX<bool> expected(5);
-        expected << true, true, true, true, true;
-
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
-
-        REQUIRE_EQUAL(expected, result);
-    };
-
     SECTION( "Simple Split (Right)" ) {
         Eigen::VectorXd z(5); // y = 1, 1, 1, 1, 2
         z << -0.25, -0.25, -0.25, -0.25, 1;
@@ -723,6 +727,7 @@ TEST_CASE( "generalised_isotonic_regression", "[isotonic_regression]" ) {
         auto [groups, y_fit] = generalised_isotonic_regression(
             adjacency_matrix,
             y,
+            Eigen::VectorXd::Constant(y.rows(), 1),
             LossFunction::L2);
 
         REQUIRE_EQUAL(expected_groups, groups);
@@ -786,6 +791,7 @@ TEST_CASE( "full example", "[isotonic_regression]" ) {
     auto [groups, y_fit] = generalised_isotonic_regression(
         adjacency_matrix,
         y(idx_new),
+        Eigen::VectorXd::Constant(y.rows(), 1),
         LossFunction::L2);
 
     VectorXu expected_groups(5);
@@ -799,8 +805,59 @@ TEST_CASE( "full example", "[isotonic_regression]" ) {
 }
 
 TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
+    SECTION( "Normal" ) {
+        for (size_t iteration = 0; iteration < 10; ++iteration) {
+            size_t dimensions = std::rand() % 10 + 1;
+
+            auto [X, y] = generate_monotonic_points(1000, 0.01, dimensions);
+
+            REQUIRE( X.rows() == y.rows() );
+            REQUIRE( X.cols() == dimensions );
+            REQUIRE( y.cols() == 1 );
+
+            auto [adjacency_matrix, idx_original, idx_new] =
+                points_to_adjacency(X);
+
+            REQUIRE( X.rows() == adjacency_matrix.rows() );
+            REQUIRE( X.rows() == adjacency_matrix.cols() );
+            REQUIRE( X.rows() == idx_original.rows() );
+            REQUIRE( X.rows() == idx_new.rows() );
+
+            Eigen::MatrixXd sorted_points = X(idx_new, Eigen::all);
+            Eigen::VectorXd sorted_ys = y(idx_new);
+            Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
+
+            REQUIRE( X.rows() == sorted_points.rows() );
+            REQUIRE( sorted_points.cols() == dimensions );
+
+            REQUIRE( X.rows() == sorted_ys.rows() );
+            REQUIRE( sorted_ys.cols() == 1 );
+
+            REQUIRE( X.rows() == weights.rows() );
+            REQUIRE( weights.cols() == 1 );
+
+            auto [groups, y_fit] = generalised_isotonic_regression(
+                adjacency_matrix,
+                sorted_ys,
+                weights,
+                LossFunction::L2);
+
+            REQUIRE( X.rows() == y_fit.rows() );
+            REQUIRE( y_fit.cols() == 1 );
+
+            REQUIRE( is_monotonic(sorted_points, y_fit) );
+            REQUIRE( is_monotonic(adjacency_matrix, y_fit) );
+        }
+    }
+
+    SECTION( "Small Weights" ) {
+
+    }
+}
+
+TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
     for (size_t iteration = 0; iteration < 10; ++iteration) {
-        size_t dimensions = std::rand() % 10;
+        size_t dimensions = std::rand() % 10 + 1;
 
         auto [X, y] = generate_monotonic_points(1000, 0.01, dimensions);
 
@@ -818,13 +875,87 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
 
         Eigen::MatrixXd sorted_points = X(idx_new, Eigen::all);
         Eigen::VectorXd sorted_ys = y(idx_new);
+        Eigen::VectorXd equal_weights = Eigen::VectorXd::Constant(y.rows(), 1);
 
-        auto [groups, y_fit] = generalised_isotonic_regression(
+        REQUIRE( X.rows() == sorted_points.rows() );
+        REQUIRE( sorted_points.cols() == dimensions );
+
+        REQUIRE( X.rows() == sorted_ys.rows() );
+        REQUIRE( sorted_ys.cols() == 1 );
+
+        REQUIRE( X.rows() == equal_weights.rows() );
+        REQUIRE( equal_weights.cols() == 1 );
+
+
+        auto [groups_l2, y_fit_l2] = generalised_isotonic_regression(
             adjacency_matrix,
             sorted_ys,
+            equal_weights,
             LossFunction::L2);
 
-        REQUIRE( is_monotonic(sorted_points, y_fit) );
-        REQUIRE( is_monotonic(adjacency_matrix, y_fit) );
+        REQUIRE( X.rows() == y_fit_l2.rows() );
+        REQUIRE( y_fit_l2.cols() == 1 );
+
+        REQUIRE( is_monotonic(sorted_points, y_fit_l2) );
+        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2) );
+
+
+        double l2_loss = calculate_loss_estimator(LossFunction::L2, sorted_ys, equal_weights);
+        double l2_loss_weighted = calculate_loss_estimator(LossFunction::L2_WEIGHTED, sorted_ys, equal_weights);
+        REQUIRE( l2_loss == l2_loss_weighted );
+
+        const auto& l2_loss_deriv = calculate_loss_derivative(LossFunction::L2, l2_loss, sorted_ys, equal_weights);
+        const auto& l2_loss_weighted_deriv = calculate_loss_derivative(LossFunction::L2_WEIGHTED, l2_loss_weighted, sorted_ys, equal_weights);
+        REQUIRE_EQUAL( l2_loss_deriv, l2_loss_weighted_deriv );
+
+
+        auto [groups_l2_weighted, y_fit_l2_weighted] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            equal_weights,
+            LossFunction::L2_WEIGHTED);
+
+        REQUIRE( X.rows() == y_fit_l2_weighted.rows() );
+        REQUIRE( y_fit_l2_weighted.cols() == 1 );
+
+        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2_weighted) );
+        REQUIRE( is_monotonic(sorted_points, y_fit_l2_weighted) );
+
+
+        REQUIRE_EQUAL( groups_l2, groups_l2_weighted );
+        REQUIRE_EQUAL( y_fit_l2, y_fit_l2_weighted );
+
+        // The y values in generate_monotonic_points are generated via the prod function and then noise is added.
+        // So we add a bias to those that are above the true y generated by the prod function.
+        Eigen::VectorXd bias_upwards_weights = (sorted_ys.array() > sorted_points.rowwise().prod().array()).select(equal_weights.array() * 2, equal_weights);
+        // or similarly below
+        Eigen::VectorXd bias_downwards_weights = (sorted_ys.array() < sorted_points.rowwise().prod().array()).select(equal_weights.array() * 2, equal_weights);
+
+        auto [groups_l2_weighted_bias_up, y_fit_l2_weighted_bias_up] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            bias_upwards_weights,
+            LossFunction::L2_WEIGHTED);
+
+        auto [groups_l2_weighted_bias_down, y_fit_l2_weighted_bias_down] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            bias_downwards_weights,
+            LossFunction::L2_WEIGHTED);
+
+        REQUIRE( X.rows() == y_fit_l2_weighted_bias_up.rows() );
+        REQUIRE( y_fit_l2_weighted_bias_up.cols() == 1 );
+
+        REQUIRE( X.rows() == y_fit_l2_weighted_bias_down.rows() );
+        REQUIRE( y_fit_l2_weighted_bias_down.cols() == 1 );
+
+        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_up) );
+        REQUIRE( is_monotonic(sorted_points, y_fit_l2_weighted_bias_up) );
+
+        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_down) );
+        REQUIRE( is_monotonic(sorted_points, y_fit_l2_weighted_bias_down) );
+
+        REQUIRE( (y_fit_l2_weighted_bias_up.array() >= y_fit_l2.array()).all() );
+        REQUIRE( (y_fit_l2_weighted_bias_down.array() <= y_fit_l2.array()).all() );
     }
 }

@@ -6,9 +6,9 @@ argpartition(const Eigen::VectorX<bool>& solution) {
 
     VectorXu p1(solution.size() - total_true);
     VectorXu p2(total_true);
-    size_t p1_idx = 0;
-    size_t p2_idx = 0;
-    for (size_t itr = 0; itr < solution.rows(); ++itr) {
+    Eigen::Index p1_idx = 0;
+    Eigen::Index p2_idx = 0;
+    for (Eigen::Index itr = 0; itr < solution.rows(); ++itr) {
         if (solution(itr)) {
             p2[p2_idx++] = itr;
         } else {

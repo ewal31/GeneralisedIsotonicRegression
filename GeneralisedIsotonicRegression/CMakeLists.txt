@@ -17,6 +17,7 @@ set(
     # -Wall
     # -Wextra
     # -Wpedantic
+    # -fsanitize=address
 )
 
 include(FetchContent)
@@ -45,6 +46,7 @@ FetchContent_Declare(
 
 set(FAST_BUILD ON CACHE INTERNAL "Fast Build")
 set(BUILD_EXAMPLES OFF CACHE INTERNAL "Build examples")
+set(HIGHSINT64 ON CACHE INTERNAL "Use 64 bit integers indexing")
 
 FetchContent_Declare(
     HIGHS

@@ -173,8 +173,8 @@ TEST_CASE( "argpartition", "[argpartition]" ) {
     SECTION( "partition 3" ) {
         input << true, true, false, true, false;
 
-        VectorXu expected_left = VectorXu(3);
-        VectorXu expected_right = VectorXu(2);
+        VectorXu expected_left = VectorXu(2);
+        VectorXu expected_right = VectorXu(3);
         expected_left << 2, 4;
         expected_right << 0, 1, 3;
 

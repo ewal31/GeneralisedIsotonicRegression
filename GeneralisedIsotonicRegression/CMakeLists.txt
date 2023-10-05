@@ -22,14 +22,6 @@ set(
 
 include(FetchContent)
 
-# TODO Only for tests.
-FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY "https://github.com/catchorg/Catch2"
-    GIT_TAG v3.4.0
-    GIT_SHALLOW TRUE
-)
-
 FetchContent_Declare(
     Eigen3
     GIT_REPOSITORY "https://gitlab.com/libeigen/eigen"
@@ -37,47 +29,49 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
-FetchContent_Declare(
-    fmt
-    GIT_REPOSITORY "https://github.com/fmtlib/fmt"
-    GIT_TAG 10.0.0
-    GIT_SHALLOW TRUE
-)
-
-set(FAST_BUILD ON CACHE INTERNAL "Fast Build")
-set(BUILD_EXAMPLES OFF CACHE INTERNAL "Build examples")
-set(HIGHSINT64 ON CACHE INTERNAL "Use 64 bit integers indexing")
-
-FetchContent_Declare(
-    HIGHS
-    GIT_REPOSITORY "https://github.com/ERGO-Code/HiGHS"
-    GIT_TAG v1.5.3
-    GIT_SHALLOW TRUE
-)
+# FetchContent_Declare(
+#     fmt
+#     GIT_REPOSITORY "https://github.com/fmtlib/fmt"
+#     GIT_TAG 10.0.0
+#     GIT_SHALLOW TRUE
+# )
 
 FetchContent_MakeAvailable(
-    Catch2
     Eigen3
-    fmt
-    HIGHS
+    # fmt
 )
+
+# Just Clang and GNU
+# add_compile_options("-fno-omit-frame-pointer")
+# add_link_options("-fno-omit-frame-pointer")
+#
+# add_compile_options("-fsanitize=address")
+# add_link_options("-fsanitize=address")
+#
+# add_compile_options("-fsanitize=undefined")
+# add_link_options("-fsanitize=undefined")
 
 add_subdirectory(isotonic_regression)
 
+option(BUILD_GIR_CLI_TOOL "Build CLI Tool" OFF)
+option(BUILD_GIR_EXAMPLES "Build Examples" OFF)
+option(BUILD_GIR_TESTS    "Build Tests" OFF)
+
+message(STATUS "Build GIR CLI Tool: ${BUILD_GIR_CLI_TOOL}")
+message(STATUS "Build GIR Examples: ${BUILD_GIR_EXAMPLES}")
+message(STATUS "Build GIR Tests: ${BUILD_GIR_TESTS}")
+
+if (BUILD_GIR_CLI_TOOL)
+    message(STATUS "Building CLI Tool")
+    add_subdirectory(cli)
+endif (BUILD_GIR_CLI_TOOL)
+
 if (BUILD_GIR_EXAMPLES)
+    message(STATUS "Building Examples")
     add_subdirectory(example)
 endif (BUILD_GIR_EXAMPLES)
 
 if (BUILD_GIR_TESTS)
+    message(STATUS "Building Tests")
     add_subdirectory(tests)
 endif (BUILD_GIR_TESTS)
-
-# Just Clang and GNU
-add_compile_options("-fno-omit-frame-pointer")
-add_link_options("-fno-omit-frame-pointer")
-
-add_compile_options("-fsanitize=address")
-add_link_options("-fsanitize=address")
-
-add_compile_options("-fsanitize=undefined")
-add_link_options("-fsanitize=undefined")

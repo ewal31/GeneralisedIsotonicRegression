@@ -78,7 +78,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 1, 1, 3, 5;
-        REQUIRE( is_monotonic(adjacency_matrix, y) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y) );
     }
 
     SECTION( "adjacency matrix (monotonic 2)" ) {
@@ -99,7 +99,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 2, 1, 2, 5;
-        REQUIRE( is_monotonic(adjacency_matrix, y) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y) );
     }
 
     SECTION( "adjacency matrix (not monotonic 1)" ) {
@@ -120,7 +120,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 1, 1, 3, 2.9;
-        REQUIRE( !is_monotonic(adjacency_matrix, y) );
+        REQUIRE( !gir::is_monotonic(adjacency_matrix, y) );
     }
 
     SECTION( "adjacency matrix (not monotonic 2)" ) {
@@ -141,7 +141,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 1, 1, 0.9, 5;
-        REQUIRE( !is_monotonic(adjacency_matrix, y) );
+        REQUIRE( !gir::is_monotonic(adjacency_matrix, y) );
     }
 
     SECTION( "points (monotonic 1)" ) {
@@ -161,7 +161,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 1, 1, 3, 5;
-        REQUIRE( is_monotonic(points, y) );
+        REQUIRE( gir::is_monotonic(points, y) );
     }
 
     SECTION( "points (monotonic 2)" ) {
@@ -181,7 +181,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 2, 1, 3, 5;
-        REQUIRE( is_monotonic(points, y) );
+        REQUIRE( gir::is_monotonic(points, y) );
     }
 
     SECTION( "points (not monotonic 1)" ) {
@@ -201,7 +201,7 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 1, 1, 3, 2.9;
-        REQUIRE( !is_monotonic(points, y) );
+        REQUIRE( !gir::is_monotonic(points, y) );
     }
 
     SECTION( "points (not monotonic 2)" ) {
@@ -221,14 +221,14 @@ TEST_CASE( "is_monotonic", "[isotonic_regression]" ) {
 
         Eigen::VectorX<double> y(5);
         y << 0, 1, 1, 0.9, 5;
-        REQUIRE( !is_monotonic(points, y) );
+        REQUIRE( !gir::is_monotonic(points, y) );
     }
 }
 
 
 TEST_CASE( "generate_monotonic_points", "[isotonic_regression]" ) {
     SECTION( "1-dimensional" ) {
-        auto [X, y] = generate_monotonic_points(5, 0.1, 1);
+        auto [X, y] = gir::generate_monotonic_points(5, 0.1, 1);
 
         REQUIRE( X.rows() == 5 );
         REQUIRE( X.cols() == 1 );
@@ -237,7 +237,7 @@ TEST_CASE( "generate_monotonic_points", "[isotonic_regression]" ) {
     }
 
     SECTION( "3-dimensional" ) {
-        auto [X, y] = generate_monotonic_points(10, 0.1, 3);
+        auto [X, y] = gir::generate_monotonic_points(10, 0.1, 3);
 
         REQUIRE( X.rows() == 10 );
         REQUIRE( X.cols() == 3 );
@@ -246,7 +246,7 @@ TEST_CASE( "generate_monotonic_points", "[isotonic_regression]" ) {
     }
 
     SECTION( "is monotonic" ) {
-        auto [X, y] = generate_monotonic_points(10, 0., 2);
+        auto [X, y] = gir::generate_monotonic_points(10, 0., 2);
 
         REQUIRE( X.rows() == 10 );
         REQUIRE( X.cols() == 2 );
@@ -296,7 +296,7 @@ TEST_CASE( "points_to_adjacency", "[isotonic_regression]" ) {
         expected_adjacency.insert(3, 4) = true;
 
         auto [adjacency_matrix, idx_original, idx_new] =
-            points_to_adjacency(points);
+            gir::points_to_adjacency(points);
 
         REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
     }
@@ -323,7 +323,7 @@ TEST_CASE( "points_to_adjacency", "[isotonic_regression]" ) {
         expected_adjacency.insert(3, 4) = true;
 
         auto [adjacency_matrix, idx_original, idx_new] =
-            points_to_adjacency(X);
+            gir::points_to_adjacency(X);
 
         REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
     }
@@ -351,14 +351,14 @@ TEST_CASE( "points_to_adjacency", "[isotonic_regression]" ) {
         expected_adjacency.insert(3, 4) = true;
 
         auto [adjacency_matrix, idx_original, idx_new] =
-            points_to_adjacency(points);
+            gir::points_to_adjacency(points);
 
         REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
     }
 }
 
 TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
-    VectorXu considered_idxs(5);
+    gir::VectorXu considered_idxs(5);
     considered_idxs << 0, 1, 2, 3, 4;
 
     SECTION( "Simple Case 1" ) {
@@ -399,7 +399,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(4, 13) = -1;
         expected.makeCompressed();
 
-        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+        auto result = gir::adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
         REQUIRE_EQUAL(expected, result);
     }
@@ -453,7 +453,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(4, 14) = -1;
         expected.makeCompressed();
 
-        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+        auto result = gir::adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
         REQUIRE_EQUAL(expected, result);
     }
@@ -474,7 +474,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         adjacency_matrix.insert(3, 4) = true;
         adjacency_matrix.makeCompressed();
 
-        VectorXu considered_idxs(3);
+        gir::VectorXu considered_idxs(3);
         considered_idxs << 0, 1, 2;
 
         /*
@@ -494,7 +494,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(2, 7) =  -1;
         expected.makeCompressed();
 
-        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+        auto result = gir::adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
         REQUIRE_EQUAL(expected, result);
     }
@@ -515,7 +515,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         adjacency_matrix.insert(3, 4) = true;
         adjacency_matrix.makeCompressed();
 
-        VectorXu considered_idxs(3);
+        gir::VectorXu considered_idxs(3);
         considered_idxs << 0, 2, 3;
 
         /*
@@ -535,7 +535,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(2, 7) =  -1;
         expected.makeCompressed();
 
-        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+        auto result = gir::adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
         REQUIRE_EQUAL(expected, result);
     }
@@ -583,7 +583,7 @@ TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
         expected.insert(4, 12) = -1;
         expected.makeCompressed();
 
-        auto result = adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
+        auto result = gir::adjacency_to_LP_standard_form(adjacency_matrix, considered_idxs);
 
         REQUIRE_EQUAL(expected, result);
     }
@@ -605,7 +605,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
     adjacency_matrix.insert(3, 4) = true;
     adjacency_matrix.makeCompressed();
 
-    VectorXu idxs(5);
+    gir::VectorXu idxs(5);
     idxs << 0, 1, 2, 3, 4;
 
     SECTION( "Simple Split (Right)" ) {
@@ -615,7 +615,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorX<bool> expected(5);
         expected << false, false, false, false, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -627,7 +627,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorX<bool> expected(5);
         expected << false, true, true, true, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -639,7 +639,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorX<bool> expected(5);
         expected << false, false, true, true, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -651,7 +651,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorX<bool> expected(5);
         expected << false, false, true, true, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -663,7 +663,7 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorX<bool> expected(5);
         expected << true, true, true, true, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -672,13 +672,13 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorXd z(5); // y = 1, 1, 2, 2, 2;
         z << -1, 0.667, 0.667;
 
-        VectorXu idxs(3);
+        gir::VectorXu idxs(3);
         idxs << 1, 2, 3;
 
         Eigen::VectorX<bool> expected(3);
         expected << false, true, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -687,13 +687,13 @@ TEST_CASE( "minimum_cut", "[isotonic_regression]" ) {
         Eigen::VectorXd z(5); // y = 1, 1, 2, 2, 2;
         z << 0.667, 0.667, 0.667;
 
-        VectorXu idxs(3);
+        gir::VectorXu idxs(3);
         idxs << 2, 3, 4;
 
         Eigen::VectorX<bool> expected(3);
         expected << true, true, true;
 
-        auto result = minimum_cut(adjacency_matrix, z, idxs);
+        auto result = gir::minimum_cut(adjacency_matrix, z, idxs);
 
         REQUIRE_EQUAL(expected, result);
     };
@@ -718,7 +718,7 @@ TEST_CASE( "generalised_isotonic_regression", "[isotonic_regression]" ) {
         Eigen::VectorXd y(5);
         y << 1, 1, 3, 5, 5;
 
-        VectorXu expected_groups(5);
+        gir::VectorXu expected_groups(5);
         expected_groups << 0, 0, 1, 2, 2;
 
         Eigen::VectorXd expected_y_fit(5);
@@ -728,7 +728,7 @@ TEST_CASE( "generalised_isotonic_regression", "[isotonic_regression]" ) {
             adjacency_matrix,
             y,
             Eigen::VectorXd::Constant(y.rows(), 1),
-            LossFunction::L2);
+            gir::LossFunction::L2);
 
         REQUIRE_EQUAL(expected_groups, groups);
         REQUIRE_EQUAL(expected_y_fit, y_fit);
@@ -751,7 +751,7 @@ TEST_CASE( "full example", "[isotonic_regression]" ) {
          0.0222442;
 
     auto [adjacency_matrix, idx_original, idx_new] =
-        points_to_adjacency(points);
+        gir::points_to_adjacency(points);
 
     /*
         * . . x x .
@@ -792,16 +792,16 @@ TEST_CASE( "full example", "[isotonic_regression]" ) {
         adjacency_matrix,
         y(idx_new),
         Eigen::VectorXd::Constant(y.rows(), 1),
-        LossFunction::L2);
+        gir::LossFunction::L2);
 
-    VectorXu expected_groups(5);
+    gir::VectorXu expected_groups(5);
     expected_groups << 0, 1, 2, 3, 4;
 
     REQUIRE_EQUAL(expected_groups, groups);
     REQUIRE_EQUAL(expected_sorted_y, y_fit);
 
-    REQUIRE( is_monotonic(sorted_points, y_fit) );
-    REQUIRE( is_monotonic(adjacency_matrix, y_fit) );
+    REQUIRE( gir::is_monotonic(sorted_points, y_fit) );
+    REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit) );
 }
 
 TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
@@ -809,14 +809,14 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
         for (size_t iteration = 0; iteration < 10; ++iteration) {
             size_t dimensions = std::rand() % 10 + 1;
 
-            auto [X, y] = generate_monotonic_points(1000, 0.01, dimensions);
+            auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
 
             REQUIRE( X.rows() == y.rows() );
             REQUIRE( X.cols() == dimensions );
             REQUIRE( y.cols() == 1 );
 
             auto [adjacency_matrix, idx_original, idx_new] =
-                points_to_adjacency(X);
+                gir::points_to_adjacency(X);
 
             REQUIRE( X.rows() == adjacency_matrix.rows() );
             REQUIRE( X.rows() == adjacency_matrix.cols() );
@@ -840,13 +840,13 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
                 adjacency_matrix,
                 sorted_ys,
                 weights,
-                LossFunction::L2);
+                gir::LossFunction::L2);
 
             REQUIRE( X.rows() == y_fit.rows() );
             REQUIRE( y_fit.cols() == 1 );
 
-            REQUIRE( is_monotonic(sorted_points, y_fit) );
-            REQUIRE( is_monotonic(adjacency_matrix, y_fit) );
+            REQUIRE( gir::is_monotonic(sorted_points, y_fit) );
+            REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit) );
         }
     }
 
@@ -859,14 +859,14 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
     for (size_t iteration = 0; iteration < 10; ++iteration) {
         size_t dimensions = std::rand() % 10 + 1;
 
-        auto [X, y] = generate_monotonic_points(1000, 0.01, dimensions);
+        auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
 
         REQUIRE( X.rows() == y.rows() );
         REQUIRE( X.cols() == dimensions );
         REQUIRE( y.cols() == 1 );
 
         auto [adjacency_matrix, idx_original, idx_new] =
-            points_to_adjacency(X);
+            gir::points_to_adjacency(X);
 
         REQUIRE( X.rows() == adjacency_matrix.rows() );
         REQUIRE( X.rows() == adjacency_matrix.cols() );
@@ -891,21 +891,21 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
             adjacency_matrix,
             sorted_ys,
             equal_weights,
-            LossFunction::L2);
+            gir::LossFunction::L2);
 
         REQUIRE( X.rows() == y_fit_l2.rows() );
         REQUIRE( y_fit_l2.cols() == 1 );
 
-        REQUIRE( is_monotonic(sorted_points, y_fit_l2) );
-        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2) );
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2) );
 
 
-        double l2_loss = calculate_loss_estimator(LossFunction::L2, sorted_ys, equal_weights);
-        double l2_loss_weighted = calculate_loss_estimator(LossFunction::L2_WEIGHTED, sorted_ys, equal_weights);
+        double l2_loss = calculate_loss_estimator(gir::LossFunction::L2, sorted_ys, equal_weights);
+        double l2_loss_weighted = calculate_loss_estimator(gir::LossFunction::L2_WEIGHTED, sorted_ys, equal_weights);
         REQUIRE( l2_loss == l2_loss_weighted );
 
-        const auto& l2_loss_deriv = calculate_loss_derivative(LossFunction::L2, l2_loss, sorted_ys, equal_weights);
-        const auto& l2_loss_weighted_deriv = calculate_loss_derivative(LossFunction::L2_WEIGHTED, l2_loss_weighted, sorted_ys, equal_weights);
+        const auto& l2_loss_deriv = calculate_loss_derivative(gir::LossFunction::L2, l2_loss, sorted_ys, equal_weights);
+        const auto& l2_loss_weighted_deriv = calculate_loss_derivative(gir::LossFunction::L2_WEIGHTED, l2_loss_weighted, sorted_ys, equal_weights);
         REQUIRE_EQUAL( l2_loss_deriv, l2_loss_weighted_deriv );
 
 
@@ -913,13 +913,13 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
             adjacency_matrix,
             sorted_ys,
             equal_weights,
-            LossFunction::L2_WEIGHTED);
+            gir::LossFunction::L2_WEIGHTED);
 
         REQUIRE( X.rows() == y_fit_l2_weighted.rows() );
         REQUIRE( y_fit_l2_weighted.cols() == 1 );
 
-        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2_weighted) );
-        REQUIRE( is_monotonic(sorted_points, y_fit_l2_weighted) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted) );
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted) );
 
 
         REQUIRE_EQUAL( groups_l2, groups_l2_weighted );
@@ -935,13 +935,13 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
             adjacency_matrix,
             sorted_ys,
             bias_upwards_weights,
-            LossFunction::L2_WEIGHTED);
+            gir::LossFunction::L2_WEIGHTED);
 
         auto [groups_l2_weighted_bias_down, y_fit_l2_weighted_bias_down] = generalised_isotonic_regression(
             adjacency_matrix,
             sorted_ys,
             bias_downwards_weights,
-            LossFunction::L2_WEIGHTED);
+            gir::LossFunction::L2_WEIGHTED);
 
         REQUIRE( X.rows() == y_fit_l2_weighted_bias_up.rows() );
         REQUIRE( y_fit_l2_weighted_bias_up.cols() == 1 );
@@ -949,11 +949,11 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
         REQUIRE( X.rows() == y_fit_l2_weighted_bias_down.rows() );
         REQUIRE( y_fit_l2_weighted_bias_down.cols() == 1 );
 
-        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_up) );
-        REQUIRE( is_monotonic(sorted_points, y_fit_l2_weighted_bias_up) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_up) );
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted_bias_up) );
 
-        REQUIRE( is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_down) );
-        REQUIRE( is_monotonic(sorted_points, y_fit_l2_weighted_bias_down) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_down) );
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted_bias_down) );
 
         REQUIRE( (y_fit_l2_weighted_bias_up.array() >= y_fit_l2.array()).all() );
         REQUIRE( (y_fit_l2_weighted_bias_down.array() <= y_fit_l2.array()).all() );

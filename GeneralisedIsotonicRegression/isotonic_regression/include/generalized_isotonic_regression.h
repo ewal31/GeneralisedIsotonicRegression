@@ -8,6 +8,7 @@
 
 #include "utility.h"
 
+namespace gir {
 
 enum class LossFunction {
     L2,
@@ -247,4 +248,4 @@ generalised_isotonic_regression(
     const uint64_t max_iterations = 0
 );
 
-void run();
+} // namespace gir

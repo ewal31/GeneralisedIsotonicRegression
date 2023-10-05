@@ -1,5 +1,7 @@
 #include "utility.h"
 
+namespace gir {
+
 std::pair<VectorXu, VectorXu>
 argpartition(const Eigen::VectorX<bool>& solution) {
     auto total_true = solution.count();
@@ -18,3 +20,5 @@ argpartition(const Eigen::VectorX<bool>& solution) {
 
     return std::make_pair(std::move(p1), std::move(p2));
 }
+
+} // namespace gir

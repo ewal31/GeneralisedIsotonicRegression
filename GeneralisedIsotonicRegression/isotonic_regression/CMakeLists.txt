@@ -1,3 +1,18 @@
+set(FAST_BUILD ON CACHE INTERNAL "Fast Build")
+set(BUILD_EXAMPLES OFF CACHE INTERNAL "Build examples")
+set(HIGHSINT64 ON CACHE INTERNAL "Use 64 bit integers indexing")
+
+FetchContent_Declare(
+    HIGHS
+    GIT_REPOSITORY "https://github.com/ERGO-Code/HiGHS"
+    GIT_TAG v1.5.3
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(
+    HIGHS
+)
+
 add_library(isotonic_regression STATIC)
 
 target_sources(
@@ -17,7 +32,11 @@ target_link_libraries(
     isotonic_regression
     PUBLIC
     Eigen3::Eigen
-    fmt::fmt
+)
+
+target_link_libraries(
+    isotonic_regression
+    PRIVATE
     highs::highs
 )
 

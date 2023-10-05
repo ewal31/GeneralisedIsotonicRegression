@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <utility>
 
+namespace gir {
 
 using VectorXu = Eigen::VectorX<Eigen::Index>;
 
@@ -66,3 +67,5 @@ find(Eigen::VectorX<V> vec, UnaryPredicate p) {
     idxs.conservativeResize(std::distance(idxs.begin(), partition_end));
     return idxs;
 }
+
+} // namespace gir

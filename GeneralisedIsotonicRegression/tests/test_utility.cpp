@@ -9,25 +9,25 @@ TEST_CASE( "argsort Eigen::VectorX", "[argsort]" ) {
 
     SECTION( "already ordered" ) {
         input << 0, 1, 2, 3, 4;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs) == expected );
     }
 
     SECTION( "in reverse" ) {
         input << 4, 3, 2, 1, 0;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs) == expected );
     }
 
     SECTION( "out of order 1" ) {
         input << 1, 2, 4, 0, 3;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs) == expected );
     }
 
     SECTION( "out of order 2" ) {
         input << 2, 1, 0, 4, 3;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs) == expected );
     }
 
@@ -38,7 +38,7 @@ TEST_CASE( "argsort Eigen::VectorX", "[argsort]" ) {
         Eigen::VectorX<char> expected(5);
         expected << 'a', 'e', 'e', 'x', 'z';
 
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs) == expected );
     }
 }
@@ -58,7 +58,7 @@ TEST_CASE( "argsort Eigen::MatrixX", "[argsort]" ) {
                  2, 3,
                  3, 0,
                  5, 5;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs, Eigen::all) == expected );
     }
 
@@ -68,7 +68,7 @@ TEST_CASE( "argsort Eigen::MatrixX", "[argsort]" ) {
                  2, 3,
                  2, 2,
                  0, 1;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs, Eigen::all) == expected );
     }
 
@@ -78,7 +78,7 @@ TEST_CASE( "argsort Eigen::MatrixX", "[argsort]" ) {
                  2, 2,
                  5, 5,
                  0, 1;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs, Eigen::all) == expected );
     }
 
@@ -88,7 +88,7 @@ TEST_CASE( "argsort Eigen::MatrixX", "[argsort]" ) {
                  2, 2,
                  2, 3,
                  3, 0;
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
         REQUIRE( input(idxs, Eigen::all) == expected );
     }
 
@@ -107,7 +107,7 @@ TEST_CASE( "argsort Eigen::MatrixX", "[argsort]" ) {
                     'y', 'a',
                     'z', 'a';
 
-        auto idxs = argsort(input);
+        auto idxs = gir::argsort(input);
 
         REQUIRE( input(idxs, Eigen::all) == expected );
     }
@@ -119,11 +119,11 @@ TEST_CASE( "argpartition", "[argpartition]" ) {
     SECTION( "all true" ) {
         input << true, true, true, true, true;
 
-        VectorXu expected_left = VectorXu(0);
-        VectorXu expected_right = VectorXu(5);
+        gir::VectorXu expected_left = gir::VectorXu(0);
+        gir::VectorXu expected_right = gir::VectorXu(5);
         expected_right << 0, 1, 2, 3, 4;
 
-        auto [left, right] = argpartition(input);
+        auto [left, right] = gir::argpartition(input);
 
         REQUIRE( expected_left == left);
         REQUIRE( expected_right == right );
@@ -132,11 +132,11 @@ TEST_CASE( "argpartition", "[argpartition]" ) {
     SECTION( "all false" ) {
         input << false, false, false, false, false;
 
-        VectorXu expected_left = VectorXu(5);
-        VectorXu expected_right = VectorXu(0);
+        gir::VectorXu expected_left = gir::VectorXu(5);
+        gir::VectorXu expected_right = gir::VectorXu(0);
         expected_left << 0, 1, 2, 3, 4;
 
-        auto [left, right] = argpartition(input);
+        auto [left, right] = gir::argpartition(input);
 
         REQUIRE( expected_left == left);
         REQUIRE( expected_right == right );
@@ -145,12 +145,12 @@ TEST_CASE( "argpartition", "[argpartition]" ) {
     SECTION( "partition 1" ) {
         input << false, false, false, true, true;
 
-        VectorXu expected_left = VectorXu(3);
-        VectorXu expected_right = VectorXu(2);
+        gir::VectorXu expected_left = gir::VectorXu(3);
+        gir::VectorXu expected_right = gir::VectorXu(2);
         expected_left << 0, 1, 2;
         expected_right << 3, 4;
 
-        auto [left, right] = argpartition(input);
+        auto [left, right] = gir::argpartition(input);
 
         REQUIRE( expected_left == left);
         REQUIRE( expected_right == right );
@@ -159,12 +159,12 @@ TEST_CASE( "argpartition", "[argpartition]" ) {
     SECTION( "partition 2" ) {
         input << false, true, false, true, false;
 
-        VectorXu expected_left = VectorXu(3);
-        VectorXu expected_right = VectorXu(2);
+        gir::VectorXu expected_left = gir::VectorXu(3);
+        gir::VectorXu expected_right = gir::VectorXu(2);
         expected_left << 0, 2, 4;
         expected_right << 1, 3;
 
-        auto [left, right] = argpartition(input);
+        auto [left, right] = gir::argpartition(input);
 
         REQUIRE( expected_left == left);
         REQUIRE( expected_right == right );
@@ -173,12 +173,12 @@ TEST_CASE( "argpartition", "[argpartition]" ) {
     SECTION( "partition 3" ) {
         input << true, true, false, true, false;
 
-        VectorXu expected_left = VectorXu(2);
-        VectorXu expected_right = VectorXu(3);
+        gir::VectorXu expected_left = gir::VectorXu(2);
+        gir::VectorXu expected_right = gir::VectorXu(3);
         expected_left << 2, 4;
         expected_right << 0, 1, 3;
 
-        auto [left, right] = argpartition(input);
+        auto [left, right] = gir::argpartition(input);
 
         REQUIRE( expected_left == left);
         REQUIRE( expected_right == right );

@@ -7,8 +7,21 @@
 #include <cxxopts.hpp>
 #include <generalized_isotonic_regression.h>
 
+uint64_t read_total_lines(const std::string& input_file) {
+    uint64_t count = 0;
+    std::ifstream f_stream(input_file, std::ios::binary);
+    while (f_stream.ignore(std::numeric_limits<std::streamsize>::max(), '\n')) {
+        ++count;
+    }
+    f_stream.clear(std::ios_base::eofbit);
+    return count - (f_stream.unget().peek() == '\n');
+}
+
 std::tuple<Eigen::MatrixXd, Eigen::VectorXd, Eigen::VectorXd>
 read_input_data(std::string input_file) {
+    const auto total_lines = read_total_lines(input_file);
+    const auto total_values = total_lines - 1;
+
     csv::CSVFormat format;
     format
         .delimiter({'\t', ','})
@@ -31,42 +44,44 @@ read_input_data(std::string input_file) {
             return column.rfind("X_", 0) == 0;
         });
 
-    if (X_columns.size() == 0 || !has_y) {
-        // TODO could be more precise with checking.
-        std::cout << "Invalid CSV format. Expecting the following columns\n";
+    if (X_columns.size() == 0 || !has_y || total_lines == 1) {
+        std::cout << "Invalid or Empty CSV File. ";
+        std::cout << "Expecting the following columns\n";
         std::cout << "1. X_1, X_2, ... X_n\n";
         std::cout << "2. y\n";
         std::cout << "3. (Optional) weight\n";
+        std::cout << "and a least one value.";
         exit(1);
+    } else {
+        std::cout << ">> Found '" << X_columns.size() << "' X columns, with '";
+        std::cout << total_lines - 1 << "' values";
+        if (has_weights)
+            std::cout << " and weights." << std::endl;
+        else
+            std::cout << ", but no weights." << std::endl;
     }
 
-    // TODO probably best just to countlines then read directly into Eigen
-    std::vector<std::vector<double>> X(X_columns.size());
-    std::vector<double> y;
-    std::vector<double> weight;
+    Eigen::MatrixXd X(total_values, X_columns.size());
+    Eigen::VectorXd y(total_values);
+    Eigen::VectorXd weight = Eigen::VectorXd::Ones(total_values);
 
-    for (csv::CSVRow& row : reader) {
-        for (size_t i = 0; i < X_columns.size(); ++i) {
-            X[i].push_back(row[X_columns[i]].get<double>());
+    uint64_t row = 0;
+    for (csv::CSVRow& file_row : reader) {
+        for (size_t col = 0; col < X_columns.size(); ++col) {
+            X(row, col) = file_row[X_columns[col]].get<double>();
         }
-        y.push_back(row["y"].get<double>());
-        weight.push_back(has_weights ? row["weight"].get<double>() : 1.);
+        y(row) = file_row["y"].get<double>();
+        if (has_weights)
+            weight(row) = file_row["weight"].get<double>();
+        ++row;
     }
 
-    Eigen::MatrixXd X_mat(X[0].size(), X.size());
-    for (size_t i = 0; i < X_columns.size(); ++i) {
-        X_mat(Eigen::all, i) =
-            Eigen::Map<Eigen::VectorXd>(&X[i][0], X[i].size());
-    }
-
-    return std::make_tuple(
-        X_mat,
-        Eigen::Map<Eigen::VectorXd>(&y[0], y.size()),
-        Eigen::Map<Eigen::VectorXd>(&weight[0], weight.size()));
+    return std::make_tuple(std::move(X), std::move(y), std::move(weight));
 }
 
 void write_result(const std::string& output_file, const Eigen::VectorXd& y_fit) {
     std::ofstream ofstream(output_file, std::ofstream::out);
+    // TODO Should the result be written with the input?
     // csv::DelimWriter<std::ofstream, ',', '"', false> writer(ofstream);
     // csv::set_decimal_places(12); // TODO configurable
     //for (double val : y_fit) ofstream <<  y_fit << '\n';
@@ -76,24 +91,29 @@ void write_result(const std::string& output_file, const Eigen::VectorXd& y_fit) 
     ofstream.close();
 }
 
-void
-run(
+void run(
     const std::string& input_file,
     const std::string& output_file,
-    const gir::LossFunction loss)
-{
+    const gir::LossFunction loss
+) {
+    std::cout << "Reading Input" << std::endl;
     const auto [X, y, weight] = read_input_data(input_file);
 
+    std::cout << "Building Adjacency Matrix" << std::endl;
     auto [adjacency_matrix, idx_original, idx_new] =
         gir::points_to_adjacency(X);
 
+    std::cout << "Running Isotonic Regression" << std::endl;
     auto [groups, y_fit] = generalised_isotonic_regression(
-            adjacency_matrix,
-            y(idx_new),
-            weight(idx_new),
-            loss);
+        adjacency_matrix,
+        y(idx_new),
+        weight(idx_new),
+        loss);
 
+    std::cout << "Writing Result" << std::endl;
     write_result(output_file, y_fit(idx_original)); // TODO test this is the right order
+
+    std::cout << "Finished." << std::endl;
 }
 
 int main(int argc, char** argv) {

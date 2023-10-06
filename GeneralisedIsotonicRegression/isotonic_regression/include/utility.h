@@ -26,9 +26,6 @@ VectorXu argsort(const Eigen::Matrix<V, Eigen::Dynamic, 1>& vec) {
 
 template<typename V>
 VectorXu argsort(const Eigen::Matrix<V, Eigen::Dynamic, Eigen::Dynamic>& mat) {
-    // TODO should rewrite to be outerindex-wise so it would work
-    //      with both row and column major
-
     // rowwise lexicographic
     VectorXu idxs = VectorXu::LinSpaced(mat.rows(), 0, mat.rows() - 1);
 

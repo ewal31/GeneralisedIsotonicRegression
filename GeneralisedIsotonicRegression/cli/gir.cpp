@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <string>
 #include <vector>
 #include <utility>
 
@@ -79,14 +80,17 @@ read_input_data(std::string input_file) {
     return std::make_tuple(std::move(X), std::move(y), std::move(weight));
 }
 
-void write_result(const std::string& output_file, const Eigen::VectorXd& y_fit) {
-    std::ofstream ofstream(output_file, std::ofstream::out);
+void write_result(const std::string& output_file, const Eigen::VectorXd& y_fit, const gir::VectorXu& group) {
     // TODO Should the result be written with the input?
-    // csv::DelimWriter<std::ofstream, ',', '"', false> writer(ofstream);
-    // csv::set_decimal_places(12); // TODO configurable
-    //for (double val : y_fit) ofstream <<  y_fit << '\n';
-    // writer.flush();
-    ofstream << y_fit;
+    std::ofstream ofstream(output_file, std::ofstream::out);
+    csv::DelimWriter<std::ofstream, ',', '"', false> writer(ofstream);
+    csv::set_decimal_places(12); // TODO configurable
+
+    writer << std::make_tuple("y_fit", "group");
+    for (Eigen::Index i = 0; i < y_fit.rows(); ++i)
+        writer << std::make_tuple(y_fit(i), group(i));
+
+    writer.flush();
     ofstream.flush();
     ofstream.close();
 }
@@ -111,7 +115,10 @@ void run(
         loss);
 
     std::cout << "Writing Result" << std::endl;
-    write_result(output_file, y_fit(idx_original)); // TODO test this is the right order
+    // TODO test this is the right order
+    // TODO probably also want to write the group
+    //      and maybe also the partition order?
+    write_result(output_file, y_fit(idx_original), groups(idx_original));
 
     std::cout << "Finished." << std::endl;
 }
@@ -191,7 +198,10 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    const auto& parsed_loss = parsed_options["loss"].as<std::string>();
+    auto parsed_loss = parsed_options["loss"].as<std::string>();
+    std::transform(parsed_loss.begin(), parsed_loss.end(), parsed_loss.begin(),
+        [](unsigned char c){ return std::toupper(c); });
+
     if (!loss_functions.count(parsed_loss)) {
         std::cout << options.help() << std::endl;
         std::cout << "Unrecognised loss function " << parsed_loss << std::endl;

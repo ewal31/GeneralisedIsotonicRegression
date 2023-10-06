@@ -4,8 +4,7 @@ ISO_SRCS1 := $(wildcard isotonic_regression/*)
 ISO_SRCS2 := $(wildcard isotonic_regression/*/*)
 TEST_SRCS := $(wildcard tests/*)
 
-BUILD_TYPE := RelWithDebInfo
-# BUILD_TYPE := Release
+BUILD_TYPE := Release # RelWithDebInfo
 
 build/cli/gir: CMakeLists.txt $(CLI_SRCS) $(ISO_SRCS1) $(ISO_SRCS2)
 	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=OFF -DBUILD_GIR_TESTS=OFF

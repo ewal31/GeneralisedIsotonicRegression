@@ -127,8 +127,12 @@ adjacency_to_LP_standard_form(
             // add edges
             auto row_idx = std::find(considered_idxs.begin(), considered_idxs.end(), it.row());
             if (row_idx != considered_idxs.end()) {
-                standard_form.insert(std::distance(considered_idxs.begin(), row_idx), 2 * total_observations + idx) = 1; // row
-                standard_form.insert(j, 2 * total_observations + idx) = -1;       // col
+                standard_form.insert( // row of constraint
+                        std::distance(considered_idxs.begin(), row_idx),
+                        2 * total_observations + idx) = 1;
+                standard_form.insert( // col of constraint
+                        j,
+                        2 * total_observations + idx) = -1;
                 ++idx;
             }
         }
@@ -219,11 +223,9 @@ minimum_cut(
     // Could also get solution from slack and surplus by looking at the
     // weight distributions either side of 0 and finding the middle point
 
-    const Eigen::VectorX<bool> dual_solution = Eigen::VectorXd::Map(
+    return Eigen::VectorXd::Map(
         &highs.getSolution().row_dual[0],
         highs.getSolution().row_dual.size()).array() > 0; // 0 left = 1 right
-
-    return dual_solution;
 }
 
 std::pair<VectorXu, Eigen::VectorXd>
@@ -239,14 +241,15 @@ generalised_isotonic_regression(
     uint64_t group_count = 0;
     const double sentinal = 1e-30; // TODO handle properly
 
-    // objective value of partition problems. used to decide which cut to make at each iteration
+    // objective value of partitions that is used to decide
+    // which cut to make at each iteration
     Eigen::VectorXd group_loss = Eigen::VectorXd::Zero(total_observations);
 
-    // returned reslult
+    // returned result
     VectorXu groups = VectorXu::Zero(total_observations);
     Eigen::VectorXd y_fit = Eigen::VectorXd::Zero(total_observations);
 
-    // TODO these iterations could potentially be done in parallel (except the first)
+    // These iterations could potentially be done in parallel (except the first)
     for (uint64_t iteration = 1; max_iterations == 0 || iteration < max_iterations; ++iteration) {
         auto [max_cut_value, max_cut_idx] = argmax(group_loss);
 
@@ -259,11 +262,14 @@ generalised_isotonic_regression(
                 return idx == groups(i);
             });
 
-        const double estimator = calculate_loss_estimator(loss_function, y(considered_idxs), weights(considered_idxs));
-        const auto& derivative = calculate_loss_derivative(loss_function, estimator, y(considered_idxs), weights(considered_idxs));
+        const double estimator = calculate_loss_estimator(
+                loss_function, y(considered_idxs), weights(considered_idxs));
+        const auto& derivative = calculate_loss_derivative(
+                loss_function, estimator, y(considered_idxs), weights(considered_idxs));
 
         const bool zero_loss = derivative.isApproxToConstant(0);
-        const bool no_constraints = constraints_count(adjacency_matrix, considered_idxs) == 0;
+        const bool no_constraints =
+            constraints_count(adjacency_matrix, considered_idxs) == 0;
 
         if (zero_loss) {
             group_loss(considered_idxs).array() = sentinal;
@@ -272,13 +278,15 @@ generalised_isotonic_regression(
         } else if (no_constraints) {
             group_loss(considered_idxs).array() = sentinal;
 
-            for (auto idx: considered_idxs) {
-                y_fit(idx) = calculate_loss_estimator(loss_function, y(idx, Eigen::all), weights(idx, Eigen::all));
+            for (auto idx : considered_idxs) {
+                y_fit(idx) = calculate_loss_estimator(
+                        loss_function, y(idx, Eigen::all), weights(idx, Eigen::all));
                 groups(idx) = ++group_count;
             }
 
         } else {
-            const auto solution = minimum_cut(adjacency_matrix, derivative, considered_idxs);
+            const auto solution =
+                minimum_cut(adjacency_matrix, derivative, considered_idxs);
             auto [left, right] = argpartition(solution);
 
             const bool no_cut = left.rows() == 0 || right.rows() == 0;
@@ -307,6 +315,7 @@ generalised_isotonic_regression(
         }
     }
 
+    // TODO. This is wrong in more than one dimension when points are out of order.
     // Renumber from 0
     group_count = 0;
     for (Eigen::Index i = 0; i < groups.rows() - 1; ++i) {

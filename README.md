@@ -20,7 +20,7 @@ Requires
 * CMake version 3.16
 
 ```bash
-git clone <url>
+git clone https://github.com/ewal31/GeneralisedIsotonicRegression
 cd GeneralisedIsotonicRegression
 cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release -DBUILD_GIR_CLI_TOOL=ON
 make -C build
@@ -76,8 +76,8 @@ include(FetchContent)
 
 FetchContent_Declare(
     GIR
-    GIT_REPOSITORY "<url>"
-    GIT_TAG <version | hash>
+    GIT_REPOSITORY "https://github.com/ewal31/GeneralisedIsotonicRegression"
+    GIT_TAG 0.1.0
     GIT_SHALLOW TRUE
 )
 

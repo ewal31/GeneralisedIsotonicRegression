@@ -3,3 +3,5 @@
 *.png
 *.csv
 **/.ccls-cache/
+build/
+debug/

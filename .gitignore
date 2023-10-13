@@ -1,0 +1,5 @@
+*.svg
+*.gif
+*.png
+*.csv
+**/.ccls-cache/

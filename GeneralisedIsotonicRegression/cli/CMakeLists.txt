@@ -24,6 +24,11 @@ add_executable(
     gir.cpp
 )
 
+target_include_directories(
+    ${EXECUTABLE_NAME}
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 # csv library definition in CMakeLists.txt doesn't include header
 target_include_directories(
     ${EXECUTABLE_NAME}

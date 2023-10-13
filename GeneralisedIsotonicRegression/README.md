@@ -108,8 +108,10 @@ target_link_libraries(
 
 ## TODO
 
-- [ ] configurable direction for monotonicity
+- [x] rewrite loss functions code to allow for more to be added and so they can be configured
+- [x] tests for duplicate points
 - [ ] more loss functions
-- [ ] really small weights or weights of 0
-- [ ] tests for duplicate values
-- [ ] rewrite `points_to_adjacency` function to be more efficient
+- [ ] tests for really small weights or weights of 0
+- [ ] configurable direction for monotonicity (just need to multiply by -ve 1 right?)
+- [ ] rewrite `points_to_adjacency` function to be more efficient (have 2d prototype already on branch that can handle a million points or so)
+- [ ] compare with other isotonic regression implementations

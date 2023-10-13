@@ -1,12 +1,12 @@
+#include "gir.h"
+
+#include <algorithm>
 #include <filesystem>
-#include <iostream>
-#include <string>
+#include <limits>
 #include <vector>
-#include <utility>
 
 #include <csv.hpp>
 #include <cxxopts.hpp>
-#include <generalized_isotonic_regression.h>
 
 uint64_t read_total_lines(const std::string& input_file) {
     uint64_t count = 0;
@@ -80,8 +80,11 @@ read_input_data(std::string input_file) {
     return std::make_tuple(std::move(X), std::move(y), std::move(weight));
 }
 
-void write_result(const std::string& output_file, const Eigen::VectorXd& y_fit, const gir::VectorXu& group) {
-    // TODO Should the result be written with the input?
+void write_result(
+    const std::string& output_file,
+    const Eigen::VectorXd& y_fit,
+    const gir::VectorXu& group
+) {
     std::ofstream ofstream(output_file, std::ofstream::out);
     csv::DelimWriter<std::ofstream, ',', '"', false> writer(ofstream);
     csv::set_decimal_places(12); // TODO configurable
@@ -95,48 +98,19 @@ void write_result(const std::string& output_file, const Eigen::VectorXd& y_fit, 
     ofstream.close();
 }
 
-void run(
-    const std::string& input_file,
-    const std::string& output_file,
-    const gir::LossFunction loss
-) {
-    std::cout << "Reading Input" << std::endl;
-    const auto [X, y, weight] = read_input_data(input_file);
-
-    std::cout << "Building Adjacency Matrix" << std::endl;
-    auto [adjacency_matrix, idx_original, idx_new] =
-        gir::points_to_adjacency(X);
-
-    std::cout << "Running Isotonic Regression" << std::endl;
-    auto [groups, y_fit] = generalised_isotonic_regression(
-        adjacency_matrix,
-        y(idx_new),
-        weight(idx_new),
-        loss);
-
-    std::cout << "Writing Result" << std::endl;
-    // TODO test this is the right order
-    // TODO probably also want to write the group
-    //      and maybe also the partition order?
-    write_result(output_file, y_fit(idx_original), groups(idx_original));
-
-    std::cout << "Finished." << std::endl;
-}
-
 int main(int argc, char** argv) {
-    std::unordered_map<std::string, gir::LossFunction> loss_functions {
-        {"L2", gir::LossFunction::L2},
-        {"L2_WEIGHTED", gir::LossFunction::L2_WEIGHTED},
+    std::vector<std::string> loss_functions {
+        "L1", "L2", "L2_WEIGHTED" //, "HUBER"
     };
 
     std::string loss_functions_string = "Loss Function [";
     std::for_each(loss_functions.begin(), loss_functions.end(),
         [&loss_functions_string, is_first = true](const auto& entry) mutable {
             if (is_first) {
-                loss_functions_string += entry.first;
+                loss_functions_string += entry;
                 is_first = false;
             } else {
-                loss_functions_string += '|' + entry.first;
+                loss_functions_string += '|' + entry;
             }
         });
     loss_functions_string += "]";
@@ -150,6 +124,7 @@ int main(int argc, char** argv) {
         ("i,input", "Input File", cxxopts::value<std::string>())
         ("o,output", "Output File", cxxopts::value<std::string>())
         ("l,loss", loss_functions_string, cxxopts::value<std::string>()->default_value("L2"))
+        ("delta", "Huber Loss Delta", cxxopts::value<double>()->default_value("1."))
         ("h,help", "Print usage");
 
     std::vector<std::string> required_options {
@@ -202,12 +177,11 @@ int main(int argc, char** argv) {
     std::transform(parsed_loss.begin(), parsed_loss.end(), parsed_loss.begin(),
         [](unsigned char c){ return std::toupper(c); });
 
-    if (!loss_functions.count(parsed_loss)) {
+    if (std::find(loss_functions.begin(), loss_functions.end(), parsed_loss) == loss_functions.end()) {
         std::cout << options.help() << std::endl;
         std::cout << "Unrecognised loss function " << parsed_loss << std::endl;
         exit(1);
     }
-    gir::LossFunction loss = loss_functions[parsed_loss];
 
     std::cout << "Running " << options.program();
     std::cout << " with loss function '" << parsed_loss << "' on\n";
@@ -215,7 +189,15 @@ int main(int argc, char** argv) {
     std::cout << "and writing result to \n";
     std::cout << ">> '" << output_file << "'" << std::endl;
 
-    run(input_file, output_file, loss);
+    if (parsed_loss == "L1")
+        run(input_file, output_file, gir::L1());
+    else if (parsed_loss == "L2")
+        run(input_file, output_file, gir::L2());
+    else if (parsed_loss == "L2_WEIGHTED")
+        run(input_file, output_file, gir::L2_WEIGHTED());
+    // TODO not finished implementing
+    // else if (parsed_loss == "HUBER")
+    //     run(input_file, output_file, gir::HUBER(parsed_options["delta"].as<double>()));
 
     return 0;
 }

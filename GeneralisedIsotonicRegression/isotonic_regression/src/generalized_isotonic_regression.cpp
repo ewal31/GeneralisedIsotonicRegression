@@ -9,42 +9,6 @@
 
 namespace gir {
 
-Eigen::VectorXd normalise(const Eigen::VectorXd& loss_derivative) {
-    if (loss_derivative.cwiseAbs().maxCoeff() > 0)
-        // normalise largest coefficient to +/- 1
-        return loss_derivative / loss_derivative.cwiseAbs().maxCoeff();
-    return loss_derivative;
-}
-
-double calculate_loss_estimator(
-    const LossFunction loss,
-    const Eigen::VectorXd& vals,
-    const Eigen::VectorXd& weights
-) {
-    switch (loss) {
-        case LossFunction::L2_WEIGHTED:
-            return weights.cwiseProduct(vals).sum() / weights.sum();
-        default:
-        case LossFunction::L2:
-            return vals.mean();
-    }
-}
-
-Eigen::VectorXd calculate_loss_derivative(
-    const LossFunction loss,
-    const double loss_estimate,
-    const Eigen::VectorXd& vals,
-    const Eigen::VectorXd& weights
-) {
-    switch (loss) {
-        case LossFunction::L2_WEIGHTED:
-            return normalise(2 * (vals.array() - loss_estimate) * weights.array());
-        default:
-        case LossFunction::L2:
-            return normalise(2 * (vals.array() - loss_estimate));
-    }
-}
-
 std::pair<Eigen::MatrixXd, Eigen::VectorXd>
 generate_monotonic_points(uint64_t total, double sigma, uint64_t dimensions) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -71,8 +35,7 @@ generate_monotonic_points(uint64_t total, double sigma, uint64_t dimensions) {
     return std::make_pair(std::move(points), std::move(regressed_values));
 }
 
-uint64_t
-constraints_count(
+uint64_t constraints_count(
     const Eigen::SparseMatrix<bool>& adjacency_matrix,
     const VectorXu& considered_idxs
 ) {
@@ -208,10 +171,9 @@ minimum_cut(
     highs.setOptionValue("simplex_strategy", 4); // Primal
     highs.setOptionValue("log_to_console", false);
 
-    HighsStatus return_status = highs.passModel(model);
-    assert(return_status == HighsStatus::kOk);
+    highs.passModel(model);
 
-    return_status = highs.run();
+    HighsStatus return_status = highs.run();
     assert(return_status == HighsStatus::kOk);
 
     const auto model_status = highs.getModelStatus();
@@ -226,106 +188,6 @@ minimum_cut(
     return Eigen::VectorXd::Map(
         &highs.getSolution().row_dual[0],
         highs.getSolution().row_dual.size()).array() > 0; // 0 left = 1 right
-}
-
-std::pair<VectorXu, Eigen::VectorXd>
-generalised_isotonic_regression(
-    const Eigen::SparseMatrix<bool>& adjacency_matrix,
-    const Eigen::VectorXd& y,
-    const Eigen::VectorXd& weights,
-    const LossFunction loss_function,
-    const uint64_t max_iterations
-) {
-    const uint64_t total_observations = y.rows();
-
-    uint64_t group_count = 0;
-    const double sentinal = 1e-30; // TODO handle properly
-
-    // objective value of partitions that is used to decide
-    // which cut to make at each iteration
-    Eigen::VectorXd group_loss = Eigen::VectorXd::Zero(total_observations);
-
-    // returned result
-    VectorXu groups = VectorXu::Zero(total_observations);
-    Eigen::VectorXd y_fit = Eigen::VectorXd::Zero(total_observations);
-
-    // These iterations could potentially be done in parallel (except the first)
-    for (uint64_t iteration = 1; max_iterations == 0 || iteration < max_iterations; ++iteration) {
-        auto [max_cut_value, max_cut_idx] = argmax(group_loss);
-
-        if (max_cut_value == sentinal) {
-            break;
-        }
-
-        VectorXu considered_idxs = find(groups,
-            [&groups, &idx = groups(max_cut_idx)](const int i){
-                return idx == groups(i);
-            });
-
-        const double estimator = calculate_loss_estimator(
-                loss_function, y(considered_idxs), weights(considered_idxs));
-        const auto& derivative = calculate_loss_derivative(
-                loss_function, estimator, y(considered_idxs), weights(considered_idxs));
-
-        const bool zero_loss = derivative.isApproxToConstant(0);
-        const bool no_constraints =
-            constraints_count(adjacency_matrix, considered_idxs) == 0;
-
-        if (zero_loss) {
-            group_loss(considered_idxs).array() = sentinal;
-            y_fit(considered_idxs).array() = estimator;
-
-        } else if (no_constraints) {
-            group_loss(considered_idxs).array() = sentinal;
-
-            for (auto idx : considered_idxs) {
-                y_fit(idx) = calculate_loss_estimator(
-                        loss_function, y(idx, Eigen::all), weights(idx, Eigen::all));
-                groups(idx) = ++group_count;
-            }
-
-        } else {
-            const auto solution =
-                minimum_cut(adjacency_matrix, derivative, considered_idxs);
-            auto [left, right] = argpartition(solution);
-
-            const bool no_cut = left.rows() == 0 || right.rows() == 0;
-
-            if (no_cut) {
-                group_loss(considered_idxs).array() = sentinal;
-                y_fit(considered_idxs).array() = estimator;
-
-            } else {
-                const auto& loss_right = calculate_loss_derivative(
-                    loss_function, estimator, y(considered_idxs(right)), weights(considered_idxs(right))).sum();
-
-                const auto& loss_left = calculate_loss_derivative(
-                    loss_function, estimator, y(considered_idxs(left)), weights(considered_idxs(left))).sum();
-
-                group_loss(considered_idxs).array() = loss_right - loss_left;
-
-                y_fit(considered_idxs(left)).array() = calculate_loss_estimator(
-                    loss_function, y(considered_idxs(left)), weights(considered_idxs(left)));
-
-                y_fit(considered_idxs(right)).array() = calculate_loss_estimator(
-                    loss_function, y(considered_idxs(right)), weights(considered_idxs(right)));
-
-                groups(considered_idxs(right)).array() = ++group_count;
-            }
-        }
-    }
-
-    // TODO. This is wrong in more than one dimension when points are out of order.
-    // Renumber from 0
-    group_count = 0;
-    for (Eigen::Index i = 0; i < groups.rows() - 1; ++i) {
-        auto current = groups(i);
-        groups(i) = group_count;
-        group_count = current == groups(i+1) ? group_count : group_count + 1;
-    }
-    groups(groups.rows() - 1) = group_count;
-
-    return std::make_pair(std::move(groups), std::move(y_fit));
 }
 
 } // namespace gir

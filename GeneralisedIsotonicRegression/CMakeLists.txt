@@ -13,11 +13,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(
     TARGET_COMPILE_OPTIONS
     # -march=native
-    # -O3
+    -O3
     # -Wall
-    # -Wextra
     # -Wpedantic
     # -fsanitize=address
+    # -fsanitize=undefined
+    # -fno-omit-frame-pointer
+)
+
+add_compile_options(
+    # -fsanitize=address
+    # -fsanitize=undefined
+    # -fno-omit-frame-pointer
+    # -fsanitize=leak
+)
+
+add_link_options(
+    # -fsanitize=address
+    # -fsanitize=undefined
+    # -fno-omit-frame-pointer
+    # -fsanitize=leak
 )
 
 include(FetchContent)
@@ -29,27 +44,9 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
-# FetchContent_Declare(
-#     fmt
-#     GIT_REPOSITORY "https://github.com/fmtlib/fmt"
-#     GIT_TAG 10.0.0
-#     GIT_SHALLOW TRUE
-# )
-
 FetchContent_MakeAvailable(
     Eigen3
-    # fmt
 )
-
-# Just Clang and GNU
-# add_compile_options("-fno-omit-frame-pointer")
-# add_link_options("-fno-omit-frame-pointer")
-#
-# add_compile_options("-fsanitize=address")
-# add_link_options("-fsanitize=address")
-#
-# add_compile_options("-fsanitize=undefined")
-# add_link_options("-fsanitize=undefined")
 
 add_subdirectory(isotonic_regression)
 

@@ -6,29 +6,10 @@
 #include <tuple>
 #include <utility>
 
+#include "loss.h"
 #include "utility.h"
 
 namespace gir {
-
-enum class LossFunction {
-    L2,
-    L2_WEIGHTED
-};
-
-Eigen::VectorXd normalise(const Eigen::VectorXd& loss_derivative);
-
-double calculate_loss_estimator(
-    const LossFunction loss,
-    const Eigen::VectorXd& vals,
-    const Eigen::VectorXd& weights
-);
-
-Eigen::VectorXd calculate_loss_derivative(
-    const LossFunction loss,
-    const double loss_estimate,
-    const Eigen::VectorXd& vals,
-    const Eigen::VectorXd& weights
-);
 
 template<typename V>
 bool
@@ -37,7 +18,7 @@ is_monotonic(
     const Eigen::VectorX<V>& y,
     const double tolerance = 1e-6
 ) {
-    for (size_t j = 0; j < adjacency_matrix.cols(); ++j) {
+    for (Eigen::Index j = 0; j < adjacency_matrix.cols(); ++j) {
         for (Eigen::SparseMatrix<bool>::InnerIterator it(adjacency_matrix, j); it; ++it) {
             if (it.value()) {
                 if ((y(it.row()) - y(it.col())) > tolerance) {
@@ -79,6 +60,11 @@ generate_monotonic_points(
     uint64_t total,
     double sigma = 0.1,
     uint64_t dimensions = 3
+);
+
+uint64_t constraints_count(
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const VectorXu& considered_idxs
 );
 
 /**
@@ -136,6 +122,7 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
     VectorXu degree = VectorXu::Zero(total_points);
     const Eigen::MatrixX<V> sorted_points = points(sorted_idxs, Eigen::all).transpose();
     Eigen::VectorX<bool> is_predecessor = Eigen::VectorX<bool>::Zero(total_points);
+    Eigen::VectorX<bool> is_equal = Eigen::VectorX<bool>::Zero(total_points);
 
     for (uint64_t i = 1; i < total_points; ++i) {
         const auto& previous_points = sorted_points(Eigen::all,
@@ -143,8 +130,21 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
         const auto& current_point = sorted_points(Eigen::all,
             VectorXu::LinSpaced(i, i, i)).array();
 
-        is_predecessor(Eigen::seq(0, i-1)) = (
-            previous_points <= current_point).colwise().all();
+        is_predecessor(Eigen::seq(0, i-1)) =
+            (previous_points <= current_point).colwise().all();
+
+        // Just for Equal Points :(
+        // TODO it is probably also valid to just create a loop
+        // i.e. just a constraint from the last repeated to the first repeated
+        //      in any group of repeated points
+        is_equal.setZero();
+        for (Eigen::Index idx = i-1; idx >= 0; --idx) {
+            if (!sorted_points(Eigen::all, idx).cwiseEqual(sorted_points(Eigen::all, i)).all())
+                break;
+            is_equal(idx) = true;
+            ++degree(idx);
+            adjacency.insert(i, idx) = 1;
+        }
 
         degree(i) = is_predecessor.count();
 
@@ -160,7 +160,7 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
                     ++it
                 ) {
                     // TODO it might be worth stopping early if is_predecessor is all 0's;
-                    if (it.value()) {
+                    if (it.value() && !is_equal(it.row())) {
                         is_predecessor(it.row()) = false;
                     }
                 }
@@ -239,13 +239,96 @@ minimum_cut(
     const VectorXu idxs
 );
 
+template<typename LossType>
 std::pair<VectorXu, Eigen::VectorXd>
 generalised_isotonic_regression(
-    const Eigen::SparseMatrix<bool>& adjacency_matrix,
-    const Eigen::VectorXd& y,
-    const Eigen::VectorXd& weights,
-    const LossFunction loss_function,
-    const uint64_t max_iterations = 0
-);
+    Eigen::SparseMatrix<bool> adjacency_matrix,
+    Eigen::VectorXd y,
+    Eigen::VectorXd weights,
+    LossFunction<LossType> loss_fun,
+    uint64_t max_iterations = 0
+) {
+    const uint64_t total_observations = y.rows();
+
+    uint64_t group_count = 0;
+    const double sentinal = 1e-30; // TODO handle properly
+
+    // objective value of partitions that is used to decide
+    // which cut to make at each iteration
+    Eigen::VectorXd group_loss = Eigen::VectorXd::Zero(total_observations);
+
+    // returned result
+    VectorXu groups = VectorXu::Zero(total_observations);
+    Eigen::VectorXd y_fit = Eigen::VectorXd::Zero(total_observations);
+
+    // These iterations could potentially be done in parallel (except the first)
+    for (uint64_t iteration = 1; max_iterations == 0 || iteration < max_iterations; ++iteration) {
+        auto [max_cut_value, max_cut_idx] = argmax(group_loss);
+
+        if (max_cut_value == sentinal) {
+            break;
+        }
+
+        VectorXu considered_idxs = find(groups,
+            [&groups, &idx = groups(max_cut_idx)](const int i){
+                return idx == groups(i);
+            });
+
+        const double estimator = loss_fun.estimator(y(considered_idxs), weights(considered_idxs));
+
+        const auto& derivative = loss_fun.derivative(estimator, y(considered_idxs), weights(considered_idxs));
+
+        const bool zero_loss = derivative.isApproxToConstant(0);
+        const bool no_constraints =
+            constraints_count(adjacency_matrix, considered_idxs) == 0;
+
+        if (zero_loss) {
+            group_loss(considered_idxs).array() = sentinal;
+            y_fit(considered_idxs).array() = estimator;
+
+        } else if (no_constraints) {
+            group_loss(considered_idxs).array() = sentinal;
+
+            for (auto idx : considered_idxs) {
+                y_fit(idx) = loss_fun.estimator(
+                        y(idx, Eigen::all), weights(idx, Eigen::all));
+                groups(idx) = ++group_count;
+            }
+            // y_fit(considered_idxs).array() = estimator;
+            // groups(considered_idxs).array() = ++group_count;
+
+        } else {
+            const auto solution =
+                minimum_cut(adjacency_matrix, derivative, considered_idxs); // TODO could pass num constrains in as calculating twice
+            auto [left, right] = argpartition(solution);
+
+            const bool no_cut = left.rows() == 0 || right.rows() == 0;
+
+            if (no_cut) {
+                group_loss(considered_idxs).array() = sentinal;
+                y_fit(considered_idxs).array() = estimator;
+
+            } else {
+                const auto& loss_right = loss_fun.derivative(
+                    estimator, y(considered_idxs(right)), weights(considered_idxs(right))).sum();
+
+                const auto& loss_left = loss_fun.derivative(
+                    estimator, y(considered_idxs(left)), weights(considered_idxs(left))).sum();
+
+                group_loss(considered_idxs).array() = loss_right - loss_left;
+
+                y_fit(considered_idxs(left)).array() = loss_fun.estimator(
+                    y(considered_idxs(left)), weights(considered_idxs(left)));
+
+                y_fit(considered_idxs(right)).array() = loss_fun.estimator(
+                    y(considered_idxs(right)), weights(considered_idxs(right)));
+
+                groups(considered_idxs(right)).array() = ++group_count;
+            }
+        }
+    }
+
+    return std::make_pair(std::move(groups), std::move(y_fit));
+}
 
 } // namespace gir

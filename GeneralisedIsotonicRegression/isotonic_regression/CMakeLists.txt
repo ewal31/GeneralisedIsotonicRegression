@@ -19,6 +19,7 @@ target_sources(
     isotonic_regression
     PRIVATE
     src/generalized_isotonic_regression.cpp
+    src/loss.cpp
     src/utility.cpp
 )
 

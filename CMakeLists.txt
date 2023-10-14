@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(
     TARGET_COMPILE_OPTIONS
     # -march=native
+    -fext-numeric-literals
     -O3
     # -Wall
     # -Wpedantic

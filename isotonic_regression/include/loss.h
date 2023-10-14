@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 
 #include <iostream>
+#include <type_traits>
 
 namespace gir {
 
@@ -34,8 +35,14 @@ class LossFunction {
         const Eigen::VectorXd& vals,
         const Eigen::VectorXd& weights) const
     {
-        return (static_cast<Derived const*>(this))->
-            estimator(vals, weights);
+        constexpr bool has_override =
+            std::is_member_function_pointer<decltype(&Derived::estimator)>::value;
+        if constexpr (has_override) {
+            return (static_cast<Derived const*>(this))->
+                estimator(vals, weights);
+        } else {
+            return 0; // TODO implement general solution
+        }
     }
 
     Eigen::VectorXd derivative(
@@ -153,6 +160,7 @@ class L2_WEIGHTED : public LossFunction<L2_WEIGHTED> {
 class HUBER : public LossFunction<HUBER> {
  private:
     const double delta;
+
  public:
     explicit HUBER(const double delta): delta(delta) {}
 
@@ -167,13 +175,6 @@ class HUBER : public LossFunction<HUBER> {
                     0.5 * diff.pow(2),
                     delta * (diff.cwiseAbs() - 0.5 * delta))
             .sum();
-    }
-
-    double estimator(
-        const Eigen::VectorXd& vals,
-        const Eigen::VectorXd& weights) const
-    {
-        return 0; // TODO
     }
 
     Eigen::VectorXd derivative(

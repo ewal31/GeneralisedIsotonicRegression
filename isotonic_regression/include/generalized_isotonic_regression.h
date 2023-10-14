@@ -226,6 +226,362 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
         std::move(ind_new));
 }
 
+// Considering Recurisvely Cutting the space for better runtime in higher dimensions (very unfinished)
+template<typename V>
+void
+points_to_adjacency_recursive_impl(
+    // std::unordered_map<Eigen::Index, std::unordered_set<Eigen::Index>>& predecessors,
+    Eigen::VectorX<bool>& predecessors,
+    Eigen::SparseMatrix<bool>& adjacency,
+    const Eigen::MatrixX<V>& points,
+    const VectorXu& idxs
+) {
+    if (idxs.rows() <= 1) return;
+
+    if (idxs.rows() == 2) {
+        // TODO currently sorted by x so probably just have to check y.
+        if ((points(idxs(0), Eigen::all).array() <= points(idxs(1), Eigen::all).array()).all()) {
+            adjacency.insert(idxs(0), idxs(1)) = 1;
+            // predecessors[idxs(1)] = std::move(std::unordered_set<Eigen::Index>{idxs(0)});
+        } else if ((points(idxs(1), Eigen::all).array() <= points(idxs(0), Eigen::all).array()).all()) {
+            adjacency.insert(idxs(1), idxs(0)) = 1;
+            // predecessors[idxs(0)] = std::move(std::unordered_set<Eigen::Index>{idxs(1)});
+        }
+        return;
+    }
+
+    // std::cout << "\nidxs:\n" << idxs << std::endl;
+
+    const uint64_t points_left = (idxs.rows() + 1) / 2;
+    const uint64_t points_right = idxs.rows() / 2;
+    VectorXu left_idxs = idxs(Eigen::seqN(0, points_left));
+    VectorXu right_idxs = idxs(Eigen::seqN(points_left, points_right));
+
+    // std::cout << "left:\n" << left_idxs << std::endl;
+    // std::cout << "right:\n" << right_idxs << std::endl;
+
+    points_to_adjacency_recursive_impl(predecessors, adjacency, points, left_idxs);
+    points_to_adjacency_recursive_impl(predecessors, adjacency, points, right_idxs);
+
+    // std::cout << "predecessors (" << predecessors.size() << "):\n";
+    // for (auto const& pair: predecessors) {
+    //     std::cout << "{" << pair.first << ": ";
+    //     for (auto const& val: pair.second)
+    //         std::cout << val << " ";
+    //     std::cout << "}" << std::endl;
+    // }
+
+    // // should maybe make row major
+    // // sorting of y could help
+    // for (auto r_idx: right_idxs) {
+    //     // std::vector<Eigen::Index> to_add;
+
+    //     for (auto l_idx: left_idxs.reverse()) {
+    //         if (points(l_idx, 1) <= points(r_idx, 1)) { // only need to compare y as was sorted by x
+
+    //             bool should_add = true;
+    //             for (
+    //                 Eigen::SparseMatrix<bool>::ReverseInnerIterator it(adjacency, r_idx);
+    //                 it;
+    //                 --it
+    //             ) {
+    //                 if (it.value() && (points(l_idx, Eigen::all).array() <= points(it.row(), Eigen::all).array()).all()) {
+    //                     should_add = false;
+    //                     break;
+    //                 }
+    //             }
+
+    //             if (should_add) adjacency.insert(l_idx, r_idx) = 1;
+
+    //             // to_add.push_back(l_idx);
+
+    //             // if (predecessors.count(r_idx)) {
+    //             //     for (const auto predecessor: predecessors[r_idx]) {
+    //             //         if (adjacency.coeff(l_idx, predecessor)) {
+    //             //             should_add = false;
+    //             //             break;
+    //             //         }
+    //             //     }
+
+    //             //     predecessors[r_idx].insert(l_idx);
+    //             // } else {
+    //             //     predecessors[r_idx] = std::move(std::unordered_set<Eigen::Index>{l_idx});
+    //             // }
+
+    //             // if (should_add) adjacency.insert(l_idx, r_idx) = 1;
+    //             // adjacency.insert(l_idx, r_idx) = 1;
+    //         }
+    //     }
+    // }
+
+    // Eigen::VectorX<bool> predecessors = Eigen::VectorX<bool>::Zero(points.rows());
+
+    // should maybe make row major
+    // sorting of y could help
+    for (auto r_idx: right_idxs) {
+        // predecessors = adjacency.col(r_idx).toDense();
+
+        predecessors.setZero();
+        for (
+            Eigen::SparseMatrix<bool>::InnerIterator it(adjacency, r_idx);
+            it;
+            ++it
+        ) {
+            predecessors(it.row()) = it.value();
+        }
+
+        for (auto l_idx: left_idxs.reverse()) {
+            if (points(l_idx, 1) <= points(r_idx, 1)) { // only need to compare y as was sorted by x
+                predecessors(l_idx) = true;
+
+                for (
+                    Eigen::SparseMatrix<bool>::ReverseInnerIterator it(adjacency, r_idx);
+                    it;
+                    --it
+                ) {
+                    if (it.value() && (points(l_idx, Eigen::all).array() <= points(it.row(), Eigen::all).array()).all()) {
+                        predecessors(l_idx) = false;
+                        break;
+                    }
+                }
+
+            }
+        }
+
+        adjacency.col(r_idx) = predecessors.sparseView();
+
+    }
+}
+
+template<typename V>
+std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
+points_to_adjacency_recursive(const Eigen::MatrixX<V>& points) {
+    const uint64_t total_points = points.rows();
+    const uint64_t dimensions = points.cols();
+
+    // TODO could do a specialised version for 1d. Just need to sort
+    // TODO trying just 2 dimensions first.
+    // TODO do without recursion
+
+    // sort by y to avoid help with merging later
+    // VectorXu y_sorted_idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
+    // std::sort(
+    //     y_sorted_idxs.begin(),
+    //     y_sorted_idxs.end(),
+    //     [&points](const auto i, const auto j){
+    //         Eigen::Index col = 0;
+    //         while (col < points.cols()) {
+    //             if ( points(i, points.cols() - 1 - col) != points(j, points.cols() - 1 - col) )
+    //                 return points(i, points.cols() - 1 - col) < points(j, points.cols() - 1 - col);
+    //             ++col;
+    //         }
+    //         return false;
+    //     });
+
+    VectorXu x_sorted_idxs = argsort(points);
+
+    // std::unordered_map<Eigen::Index, std::unordered_set<Eigen::Index>> predecessors;
+    Eigen::VectorX<bool> predecessors = Eigen::VectorX<bool>::Zero(points.rows());
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
+    const Eigen::MatrixX<V> x_sorted_points = points(x_sorted_idxs, Eigen::all);
+    points_to_adjacency_recursive_impl(
+        predecessors,
+        adjacency,
+        x_sorted_points,
+        VectorXu::LinSpaced(total_points, 0, total_points - 1));
+
+    // std::cout << "adjacency:\n" << adjacency << std::endl;
+
+    return std::make_tuple(
+        std::move(adjacency),
+        std::move(argsort(x_sorted_idxs)),
+        std::move(x_sorted_idxs));
+}
+
+// Other non-recursive idea for faster 2-d
+// Sort points by y
+//
+// Then into the vector, we have xwise argsort of the points
+//
+// The sparse matrix size for each column is then the min of the idx and value contained when running along this argsort
+//
+// When merging we run along this argsort vector
+//
+// And we keep track of the largest contained value (y point) smaller than the y value of points to the right of the partition.
+// Whenever this value increases with a decreasing x it must be a new predecessor that isn't also a predecessor of one of the other points and should be added to the matrix
+template<typename V>
+std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
+points_to_adjacency_2d(const Eigen::MatrixX<V>& points) {
+    const uint64_t total_points = points.rows();
+    const uint64_t dimensions = points.cols();
+
+    // TODO broken for dimensions != 2
+    // and probably for a single point
+
+    // sort by y to avoid help with merging later
+    VectorXu y_sorted_idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
+    std::sort(
+        y_sorted_idxs.begin(),
+        y_sorted_idxs.end(),
+        [&points](const auto i, const auto j){
+            Eigen::Index col = 0;
+            while (col < points.cols()) {
+                if ( points(i, points.cols() - 1 - col) != points(j, points.cols() - 1 - col) )
+                    return points(i, points.cols() - 1 - col) < points(j, points.cols() - 1 - col);
+                ++col;
+            }
+            return false;
+        });
+
+    const Eigen::MatrixX<V> y_sorted_points = points(y_sorted_idxs, Eigen::all);
+
+    // work on indices sorted by x
+    const VectorXu x_sorted_idxs = argsort(y_sorted_idxs);
+
+    // std::cout << "points:\n" << y_sorted_points << std::endl;
+    // std::cout << "idxs:\n" << x_sorted_idxs << std::endl;
+
+    // this is currently ordered accoreding to increasing x
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
+    // each column contains 1s in each row where the corresponding point is smaller
+    // so we can upperbound the amount of 1s in each columns by the number of points
+    // smaller in the y-dimension (contents of x_sorted_idxs) and the number smaller
+    // in the x-dimension (index in x_sorted_idxs)
+    //adjacency.reserve();
+    // const auto to_reserve = Eigen::VectorXi::LinSpaced(total_points, 0, total_points-1).cwiseMax(10).cwiseMin(x_sorted_idxs.cast<int>());
+
+    // std::cout << "to_reserve size: " << to_reserve.rows() << " " << to_reserve.cols() << ", to_reserve max: " << to_reserve.maxCoeff() << ", to_reserve min: " << to_reserve.minCoeff() << std::endl;
+
+    adjacency.reserve(Eigen::VectorXi::Constant(total_points, 30)); // there seems to be problems reserving large amounts for specific columns
+    // adjacency.reserve(total_points);                             // however the reservation also seems to change almost nothing timewise
+
+    std::cout << "Finished reserving matrix" << std::endl;
+
+    std::vector<Eigen::Index> to_add;
+    to_add.reserve(total_points);
+
+    Eigen::Index maxcol = 0;
+    Eigen::Index maxrow = 0;
+    Eigen::Index minrow = 10000000000000000;
+
+    std::cout << "x_sorted size " << x_sorted_idxs.rows() << std::endl;
+
+    VectorXu largest_y_below(total_points);
+
+    // TODO the way this is now written could also just directly insert into
+    // std::vector and use the insert from triplet method. might be faster?
+    for (Eigen::Index j = 1; j < total_points; ++j) {
+        to_add.clear();
+        Eigen::Index max_y = -1;
+        const Eigen::Index j_val = x_sorted_idxs(j);
+
+        const auto lower_bound = largest_y_below(VectorXu::LinSpaced(j_val, 0, j_val - 1)).maxCoeff();
+
+        for (Eigen::Index i = 0;  i < j; ++i) {
+            const Eigen::Index i_val = x_sorted_idxs(j - i - 1);
+            if (max_y < i_val && i_val < j_val) {
+                to_add.push_back(j - i - 1);
+                max_y = i_val;
+                if (max_y >= lower_bound) break; // TODO is this valid logic?...
+            }
+        }
+
+        largest_y_below(j_val) = max_y;
+
+        for (size_t idx = 0; idx < to_add.size(); ++idx) {
+            const auto row = to_add[to_add.size() - idx - 1];
+
+            // if (j > maxcol) {
+            //     maxcol = j;
+            //     std::cout << "row: " << minrow << " -> " << maxrow << ", col: " << maxcol << ", out of " << total_points << ", with to add " << to_add.size() << std::endl;
+            // }
+
+            // if (row < minrow) {
+            //     minrow = row;
+            //     std::cout << "row: " << minrow << " -> " << maxrow << ", col: " << maxcol << ", out of " << total_points << ", with to add " << to_add.size() << std::endl;
+            // }
+
+            // if (row > maxrow) {
+            //     maxrow = row;
+            //     std::cout << "row: " << minrow << " -> " << maxrow << ", col: " << maxcol << ", out of " << total_points << ", with to add " << to_add.size() << std::endl;
+            // }
+
+            adjacency.insert(row, j) = 1;
+        }
+
+        // for(auto itr = to_add.rbegin(); itr != to_add.rend(); ++itr) {
+        //     adjacency.insert(*itr, j) = 1;
+        // }
+    }
+
+    // // - 1 as don't do anything with just the last entry when odd number of points
+    // uint64_t window_size = 2;
+    // for (Eigen::Index window_start = 0; window_start < total_points - 1; window_start += window_size) {
+    //     if (x_sorted_idxs(window_start) < x_sorted_idxs(window_start + 1))
+    //         adjacency.insert(window_start, window_start + 1) = 1;
+    // }
+
+    // // correct skipped point in the case of an odd number of points
+    // if (total_points % 2) {
+    //     if (x_sorted_idxs(total_points - 2) < x_sorted_idxs(total_points - 1)) adjacency.insert(total_points-2, total_points - 1);
+    //     if (x_sorted_idxs(total_points - 3) < x_sorted_idxs(total_points - 1) && x_sorted_idxs(total_points - 3) > x_sorted_idxs(total_points - 2))
+    //         adjacency.insert(total_points-3, total_points - 1);
+    // }
+
+    // // next we go through in increasing window sizes and correct the adjacency matrix by adding the missing dominated points
+    // window_size *= 2;
+    // for (Eigen::Index window_start = 0; window_start < total_points - 1; window_start += window_size) {
+    //     const bool odd_point = window_start + window_size >= total_points - 1 && total_points % 2;
+    //     const auto right_idxs = VectorXu::LinSpaced(window_size / 2 + odd_point, window_start + window_size / 2, window_start + window_size + odd_point - 1);
+
+    //     // going from rightmost to leftmost point, x decreases. if y also decreases, that means the subsequent
+    //     // point is smaller and so will have been already included as a predecessor of another point
+    //     // therefore, we are only interested in those points where y increases above the current maximum.
+    //     // VectorXu left_idxs = VectorXu::LinSpaced(window_size / 2, window_start, window_start + window_size / 2 - 1);
+    //     std::vector<Eigen::Index> left_points;
+    //     Eigen::Index max_y = x_sorted_idxs(window_start + window_size / 2 - 1);
+    //     left_points.push_back(window_start + window_size / 2 - 1);
+    //     for (Eigen::Index idx = window_start + window_size / 2 - 2; idx > window_start; --idx) {
+    //         if (x_sorted_idxs(idx) > max_y) {
+    //             left_points.push_back(idx);
+    //             max_y = x_sorted_idxs(idx);
+    //         }
+    //     }
+    //     const auto left_idxs = VectorXu::Map(&left_points[0], left_points.size());
+    //     // VectorXu left_idxs(left_points.rbegin(), left_points.rend());
+
+    //     std::cout << "left_idxs:\n" << left_idxs << std::endl;
+    //     std::cout << "right_idxs:\n" << right_idxs << std::endl;
+
+    //     // for (Eigen::Index right_point: right_idxs) {
+
+    //     // }
+
+    //     // const auto& previous_points = sorted_points(Eigen::all,
+    //     //     VectorXu::LinSpaced(i, 0, i-1)).array();
+    //     // const auto& current_point = sorted_points(Eigen::all,
+    //     //     VectorXu::LinSpaced(i, i, i)).array();
+
+    //     // is_predecessor(Eigen::seq(0, i-1)) = (
+    //     //     previous_points <= current_point).colwise().all();
+
+    //     // degree(i) = is_predecessor.count();
+    // }
+
+    adjacency.makeCompressed();
+
+    std::cout << "total entries: " << adjacency.nonZeros() << std::endl;
+    // std::cout << "adjacency:\n" << adjacency << std::endl;
+    // std::cout << "first\n" << argsort(x_sorted_idxs) << std::endl;
+    // std::cout << "second\n" << x_sorted_idxs << std::endl;
+
+    return std::make_tuple(
+        std::move(adjacency),
+        std::move(argsort(x_sorted_idxs)), // TODO these aren't right anymore
+        std::move(x_sorted_idxs));
+}
+
+
 Eigen::SparseMatrix<int>
 adjacency_to_LP_standard_form(
     const Eigen::SparseMatrix<bool>& adjacency_matrix,

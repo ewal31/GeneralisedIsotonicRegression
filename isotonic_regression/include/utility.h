@@ -8,6 +8,7 @@
 
 namespace gir {
 
+// TODO move to Eigen namespace
 using VectorXu = Eigen::VectorX<Eigen::Index>;
 
 template<typename V>

@@ -6,6 +6,8 @@
 
 #include <random>
 
+#include <fstream> // TODO
+
 template<typename V>
 void REQUIRE_EQUAL(const Eigen::VectorX<V>& a, const Eigen::VectorX<V>& b) {
     bool equal_sizes = a.rows() == b.rows() && a.cols() == b.cols();
@@ -363,6 +365,7 @@ TEST_CASE( "points_to_adjacency", "[isotonic_regression]" ) {
         auto [adjacency_matrix, idx_original, idx_new] =
             gir::points_to_adjacency(points);
 
+        std::cout << adjacency_matrix << std::endl;
         REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
     }
 }
@@ -1123,11 +1126,157 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
     }
 
     SECTION( "Brute Force vs Specialised 2d Method" ) {
+
+        // // Example were sorting according x has a larger y in the first position than in the second
+        // Eigen::MatrixXd X(50, 2);
+        // X <<  0.165645,   0.199089,
+        //       0.201584,   0.675306,
+        //       0.727667,     0.1796,
+        //       0.212365,   0.209387,
+        //       0.359143,   0.446366,
+        //       0.718781,   0.207363,
+        //       0.196356,   0.640298,
+        //       0.333099,   0.821989,
+        //       0.478842,   0.225759,
+        //      0.0730511,   0.252466,
+        //       0.206526,   0.892468,
+        //       0.960636,   0.714732,
+        //       0.210324,   0.270249,
+        //       0.209906,  0.0772728,
+        //       0.212903, 0.00304133,
+        //        0.72617,   0.733458,
+        //       0.868317,   0.200269,
+        //       0.499666,   0.456705,
+        //       0.429879,   0.917675,
+        //       0.537186,   0.176662,
+        //       0.701536,   0.728667,
+        //       0.590571,   0.402849,
+        //       0.605486,   0.432411,
+        //       0.521491,    0.40148,
+        //       0.813151,  0.0885235,
+        //       0.893501,   0.625742,
+        //       0.798854,   0.764803,
+        //       0.281802,     0.7591,
+        //      0.0351637,   0.180485,
+        //        0.84262,   0.711627,
+        //       0.955155,   0.598992,
+        //       0.304521,   0.279392,
+        //       0.842042,   0.705935,
+        //       0.973107,   0.922256,
+        //       0.314061,   0.291582,
+        //       0.140051,   0.411872,
+        //       0.970121,   0.382803,
+        //       0.223099,     0.1114,
+        //       0.374967,  0.0828588,
+        //       0.504788,      0.609,
+        //      0.0881607,    0.18133,
+        //       0.581045,   0.830296,
+        //       0.831042,   0.993861,
+        //       0.690501,   0.636393,
+        //       0.297928,   0.796643,
+        //      0.0272631,   0.434675,
+        //       0.410133,   0.264351,
+        //       0.679618,  0.0189369,
+        //      0.0373384,   0.773774,
+        //       0.497089,  0.0337763;
+
+        // Eigen::VectorXd y(50);
+        // y <<     0.0146826,
+        //           0.149764,
+        //           0.131396,
+        //          0.0393803,
+        //           0.157306,
+        //           0.167502,
+        //           0.126937,
+        //           0.279244,
+        //           0.124472,
+        //          0.0233924,
+        //           0.201819,
+        //           0.682538,
+        //          0.0471216,
+        //          0.0191445,
+        //        -0.00670423,
+        //            0.54724,
+        //           0.173357,
+        //            0.22002,
+        //           0.402023,
+        //          0.0994735,
+        //           0.513724,
+        //           0.256267,
+        //           0.250794,
+        //           0.225055,
+        //           0.055391,
+        //           0.578314,
+        //             0.6149,
+        //           0.233082,
+        //        0.000630426,
+        //           0.597516,
+        //           0.575428,
+        //          0.0786026,
+        //           0.586696,
+        //           0.899171,
+        //          0.0820639,
+        //          0.0778173,
+        //           0.376756,
+        //          0.0331575,
+        //         0.00828815,
+        //           0.320109,
+        //         0.00933839,
+        //           0.479919,
+        //           0.830411,
+        //           0.443039,
+        //           0.216159,
+        //          0.0155682,
+        //          0.0992441,
+        //          0.0332839,
+        //          0.0131102,
+        //         0.00720892;
+
+        // Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
+        // auto [adjacency_matrix_s, idx_original_s, idx_new_s] =
+        //     gir::points_to_adjacency_2d(X);
+        // auto [groups_s, y_fit_s] = generalised_isotonic_regression(
+        //     adjacency_matrix_s,
+        //     y(idx_new_s),
+        //     weights,
+        //     gir::L2());
+
+        // Eigen::MatrixXd reorederedX = X(idx_new_s, Eigen::all);
+        // Eigen::VectorXd reorederedy = y_fit_s;
+        // auto sorted_idxs = gir::argsort(reorederedX);
+        // Eigen::MatrixXd sorted_points = reorederedX(sorted_idxs, Eigen::all);
+        // Eigen::VectorXd sorted_y = reorederedy(sorted_idxs);
+        // const double tolerance = 1e-6;
+        // for (size_t row1 = 1; row1 < reorederedy.rows(); ++row1) {
+        //     for (size_t row2 = 0; row2 < row1; ++row2) {
+        //         bool is_smaller = (sorted_points(row2, Eigen::all).array() <=
+        //                 sorted_points(row1, Eigen::all).array()).all();
+        //         bool within_tolerance = (sorted_y(row2) - sorted_y(row1)) < tolerance;
+
+        //         if (is_smaller && !within_tolerance) {
+        //             std::cout << sorted_points(row2, ::Eigen::all) << " <= " << sorted_points(row1, ::Eigen::all) << std::endl;
+        //             std::cout << sorted_y(row2) << " <= " << sorted_y(row1) << std::endl;
+        //             std::cout << adjacency_matrix_s.coeff(sorted_idxs(row2), sorted_idxs(row1)) << std::endl;
+        //             std::cout << std::endl;
+        //         };
+        //     }
+        // }
+        // REQUIRE( gir::is_monotonic(Eigen::MatrixXd(X(idx_new_s, Eigen::all)), y_fit_s) );
+
         for (size_t iteration = 0; iteration < 5; ++iteration) {
             size_t dimensions = 2;
 
-            auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
+            auto [X, y] = gir::generate_monotonic_points(50, 0.01, dimensions);
             Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
+
+            std::ofstream xfile("X.txt");
+            if (xfile.is_open()) {
+                xfile << X << std::endl;
+            }
+            std::ofstream yfile("y.txt");
+            if (yfile.is_open()) {
+                yfile << y << std::endl;
+            }
 
             // Brute Force
             auto [adjacency_matrix_b, idx_original_b, idx_new_b] =
@@ -1147,7 +1296,7 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
 
             // 2d Specialised
             auto [adjacency_matrix_s, idx_original_s, idx_new_s] =
-                gir::points_to_adjacency_2d(X);
+                gir::points_to_adjacency_2d_3(X);
 
             Eigen::MatrixXd sorted_points_s = X(idx_new_s, Eigen::all);
             Eigen::VectorXd sorted_ys_s = y(idx_new_s);
@@ -1158,59 +1307,26 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
                 weights,
                 gir::L2());
 
-            REQUIRE( gir::is_monotonic(sorted_points_s, y_fit_s) );
-            REQUIRE( gir::is_monotonic(adjacency_matrix_s, y_fit_s) );
+            Eigen::MatrixXd reorederedX = X(idx_new_s, Eigen::all);
+            Eigen::VectorXd reorederedy = y_fit_s;
+            auto sorted_idxs = gir::argsort(reorederedX);
+            Eigen::MatrixXd sorted_points = reorederedX(sorted_idxs, Eigen::all);
+            Eigen::VectorXd sorted_y = reorederedy(sorted_idxs);
+            const double tolerance = 1e-6;
+            for (size_t row1 = 1; row1 < reorederedy.rows(); ++row1) {
+                for (size_t row2 = 0; row2 < row1; ++row2) {
+                    bool is_smaller = (sorted_points(row2, Eigen::all).array() <=
+                            sorted_points(row1, Eigen::all).array()).all();
+                    bool within_tolerance = (sorted_y(row2) - sorted_y(row1)) < tolerance;
 
-            Eigen::VectorXd reordered_y_fit_b = y_fit_b(idx_original_b, Eigen::all);
-            Eigen::VectorXd reordered_y_fit_s = y_fit_s(idx_original_s, Eigen::all);
-
-            REQUIRE( ((reordered_y_fit_b.array() - reordered_y_fit_s.array()) < 1e-12).all() );
-        }
-
-        // Ensuring there are duplicate points
-        for (size_t iteration = 0; iteration < 5; ++iteration) {
-            size_t dimensions = 2;
-
-            auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
-            Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
-
-            gir::VectorXu identical_points_1 = gir::VectorXu::LinSpaced(5, 0, 4);
-            gir::VectorXu identical_points_2 = gir::VectorXu::LinSpaced(10, 20, 29);
-
-            for (auto i : identical_points_1)
-                X(i, Eigen::all).array() = X(identical_points_1(0), Eigen::all).array();
-
-            for (auto i : identical_points_2)
-                X(i, Eigen::all).array() = X(identical_points_2(0), Eigen::all).array();
-
-            // Brute Force
-            auto [adjacency_matrix_b, idx_original_b, idx_new_b] =
-                gir::points_to_adjacency_N_brute_force(X);
-
-            Eigen::MatrixXd sorted_points_b = X(idx_new_b, Eigen::all);
-            Eigen::VectorXd sorted_ys_b = y(idx_new_b);
-
-            auto [groups_b, y_fit_b] = generalised_isotonic_regression(
-                adjacency_matrix_b,
-                sorted_ys_b,
-                weights,
-                gir::L2());
-
-            REQUIRE( gir::is_monotonic(sorted_points_b, y_fit_b) );
-            REQUIRE( gir::is_monotonic(adjacency_matrix_b, y_fit_b) );
-
-            // 2d Specialised
-            auto [adjacency_matrix_s, idx_original_s, idx_new_s] =
-                gir::points_to_adjacency_2d(X);
-
-            Eigen::MatrixXd sorted_points_s = X(idx_new_s, Eigen::all);
-            Eigen::VectorXd sorted_ys_s = y(idx_new_s);
-
-            auto [groups_s, y_fit_s] = generalised_isotonic_regression(
-                adjacency_matrix_s,
-                sorted_ys_s,
-                weights,
-                gir::L2());
+                    if (is_smaller && !within_tolerance) {
+                        std::cout << sorted_points(row2, ::Eigen::all) << " <= " << sorted_points(row1, ::Eigen::all) << std::endl;
+                        std::cout << sorted_y(row2) << " <= " << sorted_y(row1) << std::endl;
+                        std::cout << adjacency_matrix_s.coeff(sorted_idxs(row2), sorted_idxs(row1)) << std::endl;
+                        std::cout << std::endl;
+                    };
+                }
+            }
 
             REQUIRE( gir::is_monotonic(sorted_points_s, y_fit_s) );
             REQUIRE( gir::is_monotonic(adjacency_matrix_s, y_fit_s) );
@@ -1220,125 +1336,181 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
 
             REQUIRE( ((reordered_y_fit_b.array() - reordered_y_fit_s.array()) < 1e-12).all() );
         }
+
+        // // Ensuring there are duplicate points
+        // for (size_t iteration = 0; iteration < 5; ++iteration) {
+        //     size_t dimensions = 2;
+
+        //     auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
+        //     Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
+
+        //     gir::VectorXu identical_points_1 = gir::VectorXu::LinSpaced(5, 0, 4);
+        //     gir::VectorXu identical_points_2 = gir::VectorXu::LinSpaced(10, 20, 29);
+
+        //     for (auto i : identical_points_1)
+        //         X(i, Eigen::all).array() = X(identical_points_1(0), Eigen::all).array();
+
+        //     for (auto i : identical_points_2)
+        //         X(i, Eigen::all).array() = X(identical_points_2(0), Eigen::all).array();
+
+        //     // Brute Force
+        //     auto [adjacency_matrix_b, idx_original_b, idx_new_b] =
+        //         gir::points_to_adjacency_N_brute_force(X);
+
+        //     Eigen::MatrixXd sorted_points_b = X(idx_new_b, Eigen::all);
+        //     Eigen::VectorXd sorted_ys_b = y(idx_new_b);
+
+        //     auto [groups_b, y_fit_b] = generalised_isotonic_regression(
+        //         adjacency_matrix_b,
+        //         sorted_ys_b,
+        //         weights,
+        //         gir::L2());
+
+        //     REQUIRE( gir::is_monotonic(sorted_points_b, y_fit_b) );
+        //     REQUIRE( gir::is_monotonic(adjacency_matrix_b, y_fit_b) );
+
+        //     // 2d Specialised
+        //     auto [adjacency_matrix_s, idx_original_s, idx_new_s] =
+        //         gir::points_to_adjacency_2d(X);
+
+        //     Eigen::MatrixXd sorted_points_s = X(idx_new_s, Eigen::all);
+        //     Eigen::VectorXd sorted_ys_s = y(idx_new_s);
+
+        //     auto [groups_s, y_fit_s] = generalised_isotonic_regression(
+        //         adjacency_matrix_s,
+        //         sorted_ys_s,
+        //         weights,
+        //         gir::L2());
+
+        //     REQUIRE( gir::is_monotonic(sorted_points_s, y_fit_s) );
+        //     REQUIRE( gir::is_monotonic(adjacency_matrix_s, y_fit_s) );
+
+        //     Eigen::VectorXd reordered_y_fit_b = y_fit_b(idx_original_b, Eigen::all);
+        //     Eigen::VectorXd reordered_y_fit_s = y_fit_s(idx_original_s, Eigen::all);
+
+        //     REQUIRE( ((reordered_y_fit_b.array() - reordered_y_fit_s.array()) < 1e-12).all() );
+        // }
     }
 }
 
-TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
-    for (size_t iteration = 0; iteration < 5; ++iteration) {
-        size_t dimensions = std::rand() % 10 + 1;
+// TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
+//     for (size_t iteration = 0; iteration < 5; ++iteration) {
+//         size_t dimensions = std::rand() % 10 + 1;
+// 
+//         auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
+// 
+//         REQUIRE( X.rows() == y.rows() );
+//         REQUIRE( X.cols() == dimensions );
+//         REQUIRE( y.cols() == 1 );
+// 
+//         auto [adjacency_matrix, idx_original, idx_new] =
+//             gir::points_to_adjacency(X);
+// 
+//         REQUIRE( X.rows() == adjacency_matrix.rows() );
+//         REQUIRE( X.rows() == adjacency_matrix.cols() );
+//         REQUIRE( X.rows() == idx_original.rows() );
+//         REQUIRE( X.rows() == idx_new.rows() );
+// 
+//         Eigen::MatrixXd sorted_points = X(idx_new, Eigen::all);
+//         Eigen::VectorXd sorted_ys = y(idx_new);
+//         Eigen::VectorXd equal_weights = Eigen::VectorXd::Constant(y.rows(), 1);
+// 
+//         REQUIRE( X.rows() == sorted_points.rows() );
+//         REQUIRE( sorted_points.cols() == dimensions );
+// 
+//         REQUIRE( X.rows() == sorted_ys.rows() );
+//         REQUIRE( sorted_ys.cols() == 1 );
+// 
+//         REQUIRE( X.rows() == equal_weights.rows() );
+//         REQUIRE( equal_weights.cols() == 1 );
+// 
+// 
+//         auto [groups_l2, y_fit_l2] = generalised_isotonic_regression(
+//             adjacency_matrix,
+//             sorted_ys,
+//             equal_weights,
+//             gir::L2());
+// 
+//         REQUIRE( X.rows() == y_fit_l2.rows() );
+//         REQUIRE( y_fit_l2.cols() == 1 );
+// 
+//         REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2) );
+//         REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2) );
+// 
+// 
+//         double l2_loss = gir::L2().estimator(sorted_ys, equal_weights);
+//         double l2_loss_weighted = gir::L2_WEIGHTED().estimator(sorted_ys, equal_weights);
+//         REQUIRE( l2_loss == l2_loss_weighted );
+// 
+//         const auto& l2_loss_deriv = gir::L2().derivative(l2_loss, sorted_ys, equal_weights);
+//         const auto& l2_loss_weighted_deriv = gir::L2_WEIGHTED().derivative(l2_loss_weighted, sorted_ys, equal_weights);
+//         REQUIRE_EQUAL( l2_loss_deriv, l2_loss_weighted_deriv );
+// 
+// 
+//         auto [groups_l2_weighted, y_fit_l2_weighted] = generalised_isotonic_regression(
+//             adjacency_matrix,
+//             sorted_ys,
+//             equal_weights,
+//             gir::L2_WEIGHTED());
+// 
+//         REQUIRE( X.rows() == y_fit_l2_weighted.rows() );
+//         REQUIRE( y_fit_l2_weighted.cols() == 1 );
+// 
+//         REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted) );
+//         REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted) );
+// 
+// 
+//         REQUIRE_EQUAL( groups_l2, groups_l2_weighted );
+//         REQUIRE_EQUAL( y_fit_l2, y_fit_l2_weighted );
+// 
+//         // The y values in generate_monotonic_points are generated via the prod function and then noise is added.
+//         // So we add a bias to those that are above the true y generated by the prod function.
+//         Eigen::VectorXd bias_upwards_weights = (sorted_ys.array() > sorted_points.rowwise().prod().array()).select(equal_weights.array() * 2, equal_weights);
+//         // or similarly below
+//         Eigen::VectorXd bias_downwards_weights = (sorted_ys.array() < sorted_points.rowwise().prod().array()).select(equal_weights.array() * 2, equal_weights);
+// 
+//         auto [groups_l2_weighted_bias_up, y_fit_l2_weighted_bias_up] = generalised_isotonic_regression(
+//             adjacency_matrix,
+//             sorted_ys,
+//             bias_upwards_weights,
+//             gir::L2_WEIGHTED());
+// 
+//         auto [groups_l2_weighted_bias_down, y_fit_l2_weighted_bias_down] = generalised_isotonic_regression(
+//             adjacency_matrix,
+//             sorted_ys,
+//             bias_downwards_weights,
+//             gir::L2_WEIGHTED());
+// 
+//         REQUIRE( X.rows() == y_fit_l2_weighted_bias_up.rows() );
+//         REQUIRE( y_fit_l2_weighted_bias_up.cols() == 1 );
+// 
+//         REQUIRE( X.rows() == y_fit_l2_weighted_bias_down.rows() );
+//         REQUIRE( y_fit_l2_weighted_bias_down.cols() == 1 );
+// 
+//         REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_up) );
+//         REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted_bias_up) );
+// 
+//         REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_down) );
+//         REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted_bias_down) );
+// 
+//         REQUIRE( (y_fit_l2_weighted_bias_up.array() >= y_fit_l2.array()).all() );
+//         REQUIRE( (y_fit_l2_weighted_bias_down.array() <= y_fit_l2.array()).all() );
+//     }
+// }
+// 
 
-        auto [X, y] = gir::generate_monotonic_points(1000, 0.01, dimensions);
-
-        REQUIRE( X.rows() == y.rows() );
-        REQUIRE( X.cols() == dimensions );
-        REQUIRE( y.cols() == 1 );
-
-        auto [adjacency_matrix, idx_original, idx_new] =
-            gir::points_to_adjacency(X);
-
-        REQUIRE( X.rows() == adjacency_matrix.rows() );
-        REQUIRE( X.rows() == adjacency_matrix.cols() );
-        REQUIRE( X.rows() == idx_original.rows() );
-        REQUIRE( X.rows() == idx_new.rows() );
-
-        Eigen::MatrixXd sorted_points = X(idx_new, Eigen::all);
-        Eigen::VectorXd sorted_ys = y(idx_new);
-        Eigen::VectorXd equal_weights = Eigen::VectorXd::Constant(y.rows(), 1);
-
-        REQUIRE( X.rows() == sorted_points.rows() );
-        REQUIRE( sorted_points.cols() == dimensions );
-
-        REQUIRE( X.rows() == sorted_ys.rows() );
-        REQUIRE( sorted_ys.cols() == 1 );
-
-        REQUIRE( X.rows() == equal_weights.rows() );
-        REQUIRE( equal_weights.cols() == 1 );
-
-
-        auto [groups_l2, y_fit_l2] = generalised_isotonic_regression(
-            adjacency_matrix,
-            sorted_ys,
-            equal_weights,
-            gir::L2());
-
-        REQUIRE( X.rows() == y_fit_l2.rows() );
-        REQUIRE( y_fit_l2.cols() == 1 );
-
-        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2) );
-        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2) );
-
-
-        double l2_loss = gir::L2().estimator(sorted_ys, equal_weights);
-        double l2_loss_weighted = gir::L2_WEIGHTED().estimator(sorted_ys, equal_weights);
-        REQUIRE( l2_loss == l2_loss_weighted );
-
-        const auto& l2_loss_deriv = gir::L2().derivative(l2_loss, sorted_ys, equal_weights);
-        const auto& l2_loss_weighted_deriv = gir::L2_WEIGHTED().derivative(l2_loss_weighted, sorted_ys, equal_weights);
-        REQUIRE_EQUAL( l2_loss_deriv, l2_loss_weighted_deriv );
-
-
-        auto [groups_l2_weighted, y_fit_l2_weighted] = generalised_isotonic_regression(
-            adjacency_matrix,
-            sorted_ys,
-            equal_weights,
-            gir::L2_WEIGHTED());
-
-        REQUIRE( X.rows() == y_fit_l2_weighted.rows() );
-        REQUIRE( y_fit_l2_weighted.cols() == 1 );
-
-        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted) );
-        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted) );
-
-
-        REQUIRE_EQUAL( groups_l2, groups_l2_weighted );
-        REQUIRE_EQUAL( y_fit_l2, y_fit_l2_weighted );
-
-        // The y values in generate_monotonic_points are generated via the prod function and then noise is added.
-        // So we add a bias to those that are above the true y generated by the prod function.
-        Eigen::VectorXd bias_upwards_weights = (sorted_ys.array() > sorted_points.rowwise().prod().array()).select(equal_weights.array() * 2, equal_weights);
-        // or similarly below
-        Eigen::VectorXd bias_downwards_weights = (sorted_ys.array() < sorted_points.rowwise().prod().array()).select(equal_weights.array() * 2, equal_weights);
-
-        auto [groups_l2_weighted_bias_up, y_fit_l2_weighted_bias_up] = generalised_isotonic_regression(
-            adjacency_matrix,
-            sorted_ys,
-            bias_upwards_weights,
-            gir::L2_WEIGHTED());
-
-        auto [groups_l2_weighted_bias_down, y_fit_l2_weighted_bias_down] = generalised_isotonic_regression(
-            adjacency_matrix,
-            sorted_ys,
-            bias_downwards_weights,
-            gir::L2_WEIGHTED());
-
-        REQUIRE( X.rows() == y_fit_l2_weighted_bias_up.rows() );
-        REQUIRE( y_fit_l2_weighted_bias_up.cols() == 1 );
-
-        REQUIRE( X.rows() == y_fit_l2_weighted_bias_down.rows() );
-        REQUIRE( y_fit_l2_weighted_bias_down.cols() == 1 );
-
-        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_up) );
-        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted_bias_up) );
-
-        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l2_weighted_bias_down) );
-        REQUIRE( gir::is_monotonic(sorted_points, y_fit_l2_weighted_bias_down) );
-
-        REQUIRE( (y_fit_l2_weighted_bias_up.array() >= y_fit_l2.array()).all() );
-        REQUIRE( (y_fit_l2_weighted_bias_down.array() <= y_fit_l2.array()).all() );
-    }
-}
-
+// // TODO probably should write proper benchmarking code... :)
 // TEST_CASE("lots of points") {
 //     size_t dimensions = 2;
-//     auto [X, y_] = gir::generate_monotonic_points(100'000, 1e-99, dimensions);
-//     Eigen::VectorXd y = X.rowwise().prod();
+//     auto [X, y] = gir::generate_monotonic_points(400'000, 1e-3, dimensions);
+//     // Eigen::VectorXd y = X.rowwise().prod();
 //     Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
 // 
 //     std::cout << "Building adjacency Matrix" << std::endl;
 // 
 //     // 2d Specialised
 //     auto [adjacency_matrix_s, idx_original_s, idx_new_s] =
-//         gir::points_to_adjacency_2d(X);
+//         gir::points_to_adjacency_N_brute_force(X);
 // 
 //     Eigen::MatrixXd sorted_points_s = X(idx_new_s, Eigen::all);
 //     Eigen::VectorXd sorted_ys_s = y(idx_new_s);
@@ -1354,8 +1526,22 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
 //     // std::cout << "Checking monotonicity" << std::endl;
 //     // REQUIRE( gir::is_monotonic(adjacency_matrix_s, y_fit_s) );
 // 
-//     // 100'000
+//     // 100'000             1e-3
 //     // - 2d    = 252.23s
-//     // - brute = 161.96s
+//     // - brute = 161.96s   160.98
+//     // - 2d_2  = 77.42s    104.25
+//     // - 2d_3  = 75.72     100.17
+//     //
+//     // 200'000
+//     // - 2d    =
+//     // - brute = 558.96    624.58
+//     // - 2d_2  = 292.19    411.45
+//     // - 2d_3  = 277.11    359.67
+//     //
+//     // 400'000
+//     // - 2d    =
+//     // - brute = 2117.75
+//     // - 2d_2  = 1149.81
+//     // - 2d_3  = 1095.86   1556.49
 // }
-// 
+

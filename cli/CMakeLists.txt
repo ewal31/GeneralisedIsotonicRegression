@@ -2,8 +2,10 @@ set(EXECUTABLE_NAME gir)
 
 FetchContent_Declare(
     csv-parser
-    GIT_REPOSITORY "https://github.com/vincentlaucsb/csv-parser"
-    GIT_TAG 2.1.3
+    # Repository has broken writing of floats that was never merged
+    # GIT_REPOSITORY "https://github.com/vincentlaucsb/csv-parser"
+    GIT_REPOSITORY "https://github.com/ahoarau/csv-parser"
+    GIT_TAG 9a83b884b5a152e6151091a3bac5c4c11873be10
     GIT_SHALLOW TRUE
 )
 

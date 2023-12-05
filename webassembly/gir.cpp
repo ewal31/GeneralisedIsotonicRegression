@@ -1,163 +1,194 @@
 #include "gir.h"
 
+#include <algorithm>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <string_view>
 #include <vector>
 
-#include <csv.hpp>
 #include <emscripten/emscripten.h>
+#include <Eigen/Core>
+#include <Eigen/SparseCore> // # TODO should be able to delete
 #include <generalized_isotonic_regression.h>
 
+/*
+ * Haven't used the csv parser here, as it seems to make the webassembly
+ * binary quite large and doesn't seem to really want to work.
+ */
 
-uint32_t read_total_lines(std::stringstream& input) {
-    uint32_t count = 0;
-    while (input.ignore(std::numeric_limits<std::streamsize>::max(), '\n')) {
-        ++count;
-    }
-    input.clear(std::ios_base::eofbit);
-    count = count - (input.unget().peek() == '\n');
-    input.seekp(0, std::ios_base::end);
-    input.seekg(0, std::ios_base::beg);
-    return count;
+uint32_t count_lines(const std::string& input) {
+    return std::count_if(
+            input.begin(), input.end(),
+            [](const char c) { return c == '\n'; }
+        ) + (input[input.size() - 1] == '\n' ? 0 : 1);
 }
 
+long parse_row(
+    const std::string& input,
+    std::vector<std::string_view>& buffer,
+    long start_idx
+) {
+    long idx = start_idx;
+    long stop_idx = idx - 1;
+
+    while (idx < input.size() && input[idx] != '\n') {
+        if (input[idx] == ' ' || input[idx] == '\t' || input[idx] == '\r') {
+            if (idx  == start_idx) {
+                start_idx = ++idx;
+            } else { // TODO not handling spaces in between characters
+                stop_idx = stop_idx > start_idx ? stop_idx : idx - 1;
+            }
+        }
+
+        if (input[idx] == ',') {
+            stop_idx = stop_idx > start_idx ? stop_idx : idx - 1;
+            buffer.push_back(std::basic_string_view(&input[start_idx], stop_idx - start_idx + 1));
+            start_idx = ++idx;
+        } else {
+            ++idx;
+        }
+    }
+
+    stop_idx = stop_idx > start_idx ? stop_idx : idx - 1;
+    buffer.push_back(std::basic_string_view(&input[start_idx], stop_idx - start_idx + 1));
+    return idx + 1;
+}
+
+inline double parse_double(const std::string_view& str) {
+    // TODO not yet implemented in stdlib :(
+    // double parsed_double{};
+    // std::from_chars(str.data(), str.data() + str.size(), parsed_double); // TODO no error checking
+    // return parsed_double;
+    return std::stod(std::string(str));
+}
+
+/*
+ * e.g.
+ * var input = "X_1, y\n0, 1\n1,2.2\n3,1.1";
+ */
+
 std::tuple<Eigen::MatrixXd, Eigen::VectorXd, Eigen::VectorXd>
-read_input_data(std::stringstream& input) {
+parse_input_data(const std::string& input) {
 
-    std::cout << "before" << std::endl;
-    std::cout << "tellg " << input.tellg() << "\n";
-    std::cout << "tellp " << input.tellp() << "\n";
-    std::cout << "good " << input.good() << "\n";
-    std::cout << "eof " << input.eof() << "\n";
-    std::cout << "fail " << input.fail() << "\n";
-    std::cout << "bad " << input.bad() << "\n";
-    std::cout << "rdstate " << input.rdstate() << "\n";
-    std::cout << "contents " << input.str() << "\n" << std::endl;
-
-    const auto total_lines = read_total_lines(input);
+    const auto total_lines = count_lines(input);
     const auto total_values = total_lines - 1;
 
-    std::cout << "after" << std::endl;
-    std::cout << "tellg " << input.tellg() << "\n";
-    std::cout << "tellp " << input.tellp() << "\n";
-    std::cout << "good " << input.good() << "\n";
-    std::cout << "eof " << input.eof() << "\n";
-    std::cout << "fail " << input.fail() << "\n";
-    std::cout << "bad " << input.bad() << "\n";
-    std::cout << "rdstate " << input.rdstate() << "\n";
-    std::cout << "contents " << input.str() << "\n" << std::endl;
+    long index = 0;
+    std::vector<std::string_view> buffer;
 
-    csv::CSVFormat format;
-    format
-        .delimiter(',')
-        .header_row(0)
-        .trim({' '});
+    // Get column headings
+    index = parse_row(input, buffer, index);
 
-    csv::CSVReader reader = csv::parse(std::string(input.str()), format);
+    uint32_t weight_column = std::numeric_limits<uint32_t>::max();
+    uint32_t y_column = std::numeric_limits<uint32_t>::max();
+    std::vector<uint32_t> x_columns;
 
-    const auto& columns = reader.get_col_names();
-
-    std::cout << "found columns: ";
-    for (const auto& v : columns) {
-        std::cout << v << " ";
-    }
-    std::cout << std::endl;
-
-    const bool has_weights =
-        std::find(columns.begin(), columns.end(), "weight") != columns.end();
-    const bool has_y =
-        std::find(columns.begin(), columns.end(), "y") != columns.end();
-
-    std::vector<std::string> X_columns;
-    std::copy_if(
-        columns.begin(),
-        columns.end(),
-        std::back_inserter(X_columns),
-        [](const auto& column){
-            return column.rfind("X_", 0) == 0;
-        });
-
-    if (X_columns.size() == 0 || !has_y || total_lines == 1) {
-        std::cout << "Invalid or Empty CSV File. ";
-        std::cout << "Expecting the following columns\n";
-        std::cout << "1. X_1, X_2, ... X_n\n";
-        std::cout << "2. y\n";
-        std::cout << "3. (Optional) weight\n";
-        std::cout << "and a least one value.";
-        exit(1);
-    } else {
-        std::cout << ">> Found '" << X_columns.size() << "' X columns, with '";
-        std::cout << total_lines - 1 << "' values";
-        if (has_weights)
-            std::cout << " and weights." << std::endl;
-        else
-            std::cout << ", but no weights." << std::endl;
+    for (size_t i = 0; i < buffer.size(); ++i) {
+        if (buffer[i].rfind("X_", 0) == 0) {
+            x_columns.push_back(i);
+        } else if (buffer[i] == "y") {
+            y_column = i;
+        } else {
+            weight_column = i;
+        }
     }
 
-    Eigen::MatrixXd X(total_values, X_columns.size());
+    bool has_weights = weight_column < std::numeric_limits<uint32_t>::max();
+
+    Eigen::MatrixXd X(total_values, x_columns.size());
     Eigen::VectorXd y(total_values);
     Eigen::VectorXd weight = Eigen::VectorXd::Ones(total_values);
 
-    uint64_t row = 0;
-    for (csv::CSVRow& file_row : reader) {
-        for (size_t col = 0; col < X_columns.size(); ++col) {
-            X(row, col) = file_row[X_columns[col]].get<double>();
+    uint32_t row = 0;
+    while (index < input.size()) {
+        buffer.clear();
+        index = parse_row(input, buffer, index);
+
+        for (size_t col = 0; col < x_columns.size(); ++col) {
+            X(row, col) = parse_double(buffer[x_columns[col]]);
         }
-        y(row) = file_row["y"].get<double>();
+
+        y(row) = parse_double(buffer[y_column]);
+
         if (has_weights)
-            weight(row) = file_row["weight"].get<double>();
+            weight(row) = parse_double(buffer[weight_column]);
+
         ++row;
     }
 
     return std::make_tuple(std::move(X), std::move(y), std::move(weight));
 }
 
-void run_iso_regression(
-    std::stringstream& input
-) {
-    const auto loss = gir::L2();
-
-    std::cout << "Found a total of: " << read_total_lines(input) << " lines." << std::endl;
-
-    const auto [X, y, weight] = read_input_data(input);
-
-    std::cout << "X:\n" << X << std::endl;
-    std::cout << "y:\n" << X << std::endl;
-    std::cout << "weights:\n" << X << std::endl;
+uint32_t count_digits(uint32_t number) {
+    int length = 1;
+    while ( number /= 10 )
+        length++;
+    return length;
 }
 
-int runtest() {
-    auto [X, y] = gir::generate_monotonic_points(10, 1e-2, 2);
-    Eigen::VectorXd weights = Eigen::VectorXd::Constant(y.rows(), 1);
+std::string
+format_output_data(gir::VectorXu groups, Eigen::VectorXd y_fit) {
+    const uint32_t min_column_width = 5;
+    const uint32_t precision = 6;
 
-    std::cout << "point positions:\n" << X << '\n' << std::endl;
-    std::cout << "monotonic axis:\n" << y << '\n' << std::endl;
+    double integral_part;
+    std::modf(groups.maxCoeff(), &integral_part);
+    const uint32_t group_width = std::max(
+        min_column_width,
+        count_digits(integral_part));
 
+    std::modf(y_fit.maxCoeff(), &integral_part);
+    const uint32_t y_width = std::max(
+        min_column_width,
+        precision + count_digits(integral_part));
+
+    std::stringstream ss;
+    ss << std::setw(group_width + 1)
+       << "group,"
+       << std::setw(y_width)
+       << "y_fit"
+       << std::fixed
+       << std::setprecision(precision);
+
+    for (size_t row = 0; row < groups.size(); ++row) {
+        ss << '\n'
+           << std::setw(group_width)
+           << groups(row)
+           << ","
+           << std::setw(y_width)
+           << y_fit(row);
+    }
+
+    return ss.str();
+}
+
+std::string
+run_iso_regression(
+    const std::string& input
+) {
+    const auto loss_function = gir::L2();
+
+    const auto [X, y, weight] = parse_input_data(input);
+
+    std::cout << "Building Adjacency Matrix" << std::endl;
     auto [adjacency_matrix, idx_original, idx_new] =
         gir::points_to_adjacency(X);
 
-    std::cout << "adjacency matrix:\n" << adjacency_matrix << '\n' << std::endl;
-    std::cout << "adjacency matrix ordering:\n" << idx_new << '\n' << std::endl;
-    std::cout << "points reordered\n";
-    std::cout << X(idx_new, Eigen::all) << "\n" << std::endl;
-    std::cout << y(idx_new) << "\n" << std::endl;
-
-    gir::L2 loss_function;
+    std::cout << "Running Isotonic Regression" << std::endl;
 
     auto [groups, y_fit] = generalised_isotonic_regression(
-            adjacency_matrix,
-            y(idx_new),
-            weights,
-            loss_function);
-
-    std::cout << "fit y values:\n" << y_fit << "\n" << std::endl;
-    std::cout << "into groups:\n" << groups << "\n" << std::endl;
+        adjacency_matrix,
+        y(idx_new),
+        weight(idx_new),
+        loss_function);
 
     double total_loss = loss_function.loss(
         y(idx_new),
         y_fit,
-        weights);
+        weight);
+    std::cout << "Finished with total loss: " << total_loss << std::endl;
 
-    std::cout << "with total loss: " << total_loss << "\n" << std::endl;
-
-    return 0;
+    return format_output_data(groups(idx_original), y_fit(idx_original));
 }

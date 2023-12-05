@@ -40,6 +40,10 @@ wasm: webbuild/webassembly/girweb.wasm
 lspsymbols:
 	cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON
 
+lspsymbolsweb:
+	$(if $(shell command -v emcmake 2> /dev/null), $(info Found `emrun`),$(error Please obtain a copy of emsdk and source `emsdk_env.sh`))
+	emcmake cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES
+
 all:
 	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON
 	make -C build

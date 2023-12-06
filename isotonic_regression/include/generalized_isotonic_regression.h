@@ -239,19 +239,105 @@ minimum_cut(
     const VectorXu idxs
 );
 
+// TODO change return type to enum
+template<typename LossType, typename int_type>
+int8_t
+gir_update (
+    Eigen::SparseMatrix<bool>& adjacency_matrix,
+    const Eigen::VectorXd& y,
+    const Eigen::VectorXd& weights,
+    const LossFunction<LossType>& loss_fun,
+    int_type& group_count,
+    Eigen::VectorXd& group_loss,
+    VectorXu& groups,
+    Eigen::VectorXd& y_fit
+) {
+    const double sentinal = 1e-30; // TODO handle properly
+
+    auto [max_cut_value, max_cut_idx] = argmax(group_loss);
+
+    if (max_cut_value == sentinal) {
+        return -1; // optimal
+    }
+
+    VectorXu considered_idxs = find(groups,
+        [&groups, &idx = groups(max_cut_idx)](const int i){
+            return idx == groups(i);
+        });
+
+    const double estimator = loss_fun.estimator(y(considered_idxs), weights(considered_idxs));
+
+    const auto& derivative = loss_fun.derivative(estimator, y(considered_idxs), weights(considered_idxs));
+
+    const bool zero_loss = derivative.isApproxToConstant(0);
+    const bool no_constraints =
+        constraints_count(adjacency_matrix, considered_idxs) == 0;
+
+    if (zero_loss) {
+        group_loss(considered_idxs).array() = sentinal;
+        y_fit(considered_idxs).array() = estimator;
+        return 0; // nothing changed
+
+    } else if (no_constraints) {
+        group_loss(considered_idxs).array() = sentinal;
+
+        for (auto idx : considered_idxs) {
+            y_fit(idx) = loss_fun.estimator(
+                    y(idx, Eigen::all), weights(idx, Eigen::all));
+            groups(idx) = ++group_count;
+        }
+        // y_fit(considered_idxs).array() = estimator;
+        // groups(considered_idxs).array() = ++group_count;
+        return 1; // something changed
+
+    } else {
+        const auto solution =
+            minimum_cut(adjacency_matrix, derivative, considered_idxs); // TODO could pass num constrains in as calculating twice
+        auto [left, right] = argpartition(solution);
+
+        const bool no_cut = left.rows() == 0 || right.rows() == 0;
+
+        if (no_cut) {
+            group_loss(considered_idxs).array() = sentinal;
+            y_fit(considered_idxs).array() = estimator;
+            return 0; // nothing changed
+
+        } else {
+            const auto& loss_right = loss_fun.derivative(
+                estimator, y(considered_idxs(right)), weights(considered_idxs(right))).sum();
+
+            const auto& loss_left = loss_fun.derivative(
+                estimator, y(considered_idxs(left)), weights(considered_idxs(left))).sum();
+
+            group_loss(considered_idxs).array() = loss_right - loss_left;
+
+            y_fit(considered_idxs(left)).array() = loss_fun.estimator(
+                y(considered_idxs(left)), weights(considered_idxs(left)));
+
+            y_fit(considered_idxs(right)).array() = loss_fun.estimator(
+                y(considered_idxs(right)), weights(considered_idxs(right)));
+
+            groups(considered_idxs(right)).array() = ++group_count;
+
+            return 1; // something changed
+        }
+    }
+}
+
+// TODO need a version that can take by reference as well
+//      but the copy is really convenient for auto changing
+//      the type
 template<typename LossType>
 std::pair<VectorXu, Eigen::VectorXd>
-generalised_isotonic_regression(
-    Eigen::SparseMatrix<bool> adjacency_matrix,
+generalised_isotonic_regression (
+    Eigen::SparseMatrix<bool>& adjacency_matrix,
     Eigen::VectorXd y,
     Eigen::VectorXd weights,
     LossFunction<LossType> loss_fun,
     uint64_t max_iterations = 0
 ) {
     const uint64_t total_observations = y.rows();
-
     uint64_t group_count = 0;
-    const double sentinal = 1e-30; // TODO handle properly
 
     // objective value of partitions that is used to decide
     // which cut to make at each iteration
@@ -262,70 +348,17 @@ generalised_isotonic_regression(
     Eigen::VectorXd y_fit = Eigen::VectorXd::Zero(total_observations);
 
     // These iterations could potentially be done in parallel (except the first)
-    for (uint64_t iteration = 1; max_iterations == 0 || iteration < max_iterations; ++iteration) {
-        auto [max_cut_value, max_cut_idx] = argmax(group_loss);
-
-        if (max_cut_value == sentinal) {
-            break;
-        }
-
-        VectorXu considered_idxs = find(groups,
-            [&groups, &idx = groups(max_cut_idx)](const int i){
-                return idx == groups(i);
-            });
-
-        const double estimator = loss_fun.estimator(y(considered_idxs), weights(considered_idxs));
-
-        const auto& derivative = loss_fun.derivative(estimator, y(considered_idxs), weights(considered_idxs));
-
-        const bool zero_loss = derivative.isApproxToConstant(0);
-        const bool no_constraints =
-            constraints_count(adjacency_matrix, considered_idxs) == 0;
-
-        if (zero_loss) {
-            group_loss(considered_idxs).array() = sentinal;
-            y_fit(considered_idxs).array() = estimator;
-
-        } else if (no_constraints) {
-            group_loss(considered_idxs).array() = sentinal;
-
-            for (auto idx : considered_idxs) {
-                y_fit(idx) = loss_fun.estimator(
-                        y(idx, Eigen::all), weights(idx, Eigen::all));
-                groups(idx) = ++group_count;
-            }
-            // y_fit(considered_idxs).array() = estimator;
-            // groups(considered_idxs).array() = ++group_count;
-
-        } else {
-            const auto solution =
-                minimum_cut(adjacency_matrix, derivative, considered_idxs); // TODO could pass num constrains in as calculating twice
-            auto [left, right] = argpartition(solution);
-
-            const bool no_cut = left.rows() == 0 || right.rows() == 0;
-
-            if (no_cut) {
-                group_loss(considered_idxs).array() = sentinal;
-                y_fit(considered_idxs).array() = estimator;
-
-            } else {
-                const auto& loss_right = loss_fun.derivative(
-                    estimator, y(considered_idxs(right)), weights(considered_idxs(right))).sum();
-
-                const auto& loss_left = loss_fun.derivative(
-                    estimator, y(considered_idxs(left)), weights(considered_idxs(left))).sum();
-
-                group_loss(considered_idxs).array() = loss_right - loss_left;
-
-                y_fit(considered_idxs(left)).array() = loss_fun.estimator(
-                    y(considered_idxs(left)), weights(considered_idxs(left)));
-
-                y_fit(considered_idxs(right)).array() = loss_fun.estimator(
-                    y(considered_idxs(right)), weights(considered_idxs(right)));
-
-                groups(considered_idxs(right)).array() = ++group_count;
-            }
-        }
+    for (uint64_t iteration = 0; max_iterations == 0 || iteration < max_iterations; ++iteration) {
+        if (gir_update(
+            adjacency_matrix,
+            y,
+            weights,
+            loss_fun,
+            group_count,
+            group_loss,
+            groups,
+            y_fit
+        )) break;
     }
 
     return std::make_pair(std::move(groups), std::move(y_fit));

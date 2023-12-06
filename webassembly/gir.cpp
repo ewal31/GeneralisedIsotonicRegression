@@ -9,15 +9,60 @@
 #include <vector>
 
 #include <emscripten/emscripten.h>
-#include <Eigen/Core>
-#include <Eigen/SparseCore> // # TODO should be able to delete
-#include <generalized_isotonic_regression.h>
+
+HTMLElementBuffer::int_type HTMLElementBuffer::overflow(int_type c) {
+    *pptr() = c;
+    pbump(1);
+    write_to_element();
+    init();
+    return c;
+}
+
+int HTMLElementBuffer::sync() {
+    if (pptr() > &data[0]) {
+        write_to_element();
+    }
+    init();
+    return 0;
+}
+
+void HTMLElementBuffer::write_to_element() {
+    *pptr() = 0; // treat as c string
+    if (this->element_id == "") {
+        EM_ASM_({
+            console.log(Module.UTF8ToString($0));
+        }, &data[0]);
+    } else {
+        EM_ASM_({
+            var element = document.getElementById('console');
+            element.value += Module.UTF8ToString($0);
+            element.scrollTop = element.scrollHeight;
+        }, &data[0]);
+    }
+}
+
+void HTMLElementBuffer::init() {
+    // leave extra space to add the overflow character
+    // and null terminator as c string is required
+    setp(&data[0], &data[0] + data.size() - 2);
+}
+
+HTMLElementBuffer::HTMLElementBuffer() {
+    init();
+}
+
+void HTMLElementBuffer::set_element(const std::string& element_id) {
+    this->element_id = element_id;
+}
+
+void update_element_buffer_element_id(const std::string& element_id) {
+    element_buffer.set_element(element_id);
+}
 
 /*
  * Haven't used the csv parser here, as it seems to make the webassembly
  * binary quite large and doesn't seem to really want to work.
  */
-
 uint32_t count_lines(const std::string& input) {
     return std::count_if(
             input.begin(), input.end(),
@@ -35,14 +80,12 @@ long parse_row(
 
     while (idx < input.size() && input[idx] != '\n') {
         if (input[idx] == ' ' || input[idx] == '\t' || input[idx] == '\r') {
-            if (idx  == start_idx) {
+            if (idx == start_idx) {
                 start_idx = ++idx;
             } else { // TODO not handling spaces in between characters
                 stop_idx = stop_idx > start_idx ? stop_idx : idx - 1;
             }
-        }
-
-        if (input[idx] == ',') {
+        } else if (input[idx] == ',') {
             stop_idx = stop_idx > start_idx ? stop_idx : idx - 1;
             buffer.push_back(std::basic_string_view(&input[start_idx], stop_idx - start_idx + 1));
             start_idx = ++idx;
@@ -63,11 +106,6 @@ inline double parse_double(const std::string_view& str) {
     // return parsed_double;
     return std::stod(std::string(str));
 }
-
-/*
- * e.g.
- * var input = "X_1, y\n0, 1\n1,2.2\n3,1.1";
- */
 
 std::tuple<Eigen::MatrixXd, Eigen::VectorXd, Eigen::VectorXd>
 parse_input_data(const std::string& input) {
@@ -142,11 +180,12 @@ format_output_data(gir::VectorXu groups, Eigen::VectorXd y_fit) {
     std::modf(y_fit.maxCoeff(), &integral_part);
     const uint32_t y_width = std::max(
         min_column_width,
-        precision + count_digits(integral_part));
+        // extra 1 for decimal point
+        1 + precision + count_digits(integral_part));
 
     std::stringstream ss;
-    ss << std::setw(group_width + 1)
-       << "group,"
+    ss << std::setw(group_width + 2)
+       << "group, "
        << std::setw(y_width)
        << "y_fit"
        << std::fixed
@@ -156,7 +195,7 @@ format_output_data(gir::VectorXu groups, Eigen::VectorXd y_fit) {
         ss << '\n'
            << std::setw(group_width)
            << groups(row)
-           << ","
+           << ", "
            << std::setw(y_width)
            << y_fit(row);
     }
@@ -164,31 +203,27 @@ format_output_data(gir::VectorXu groups, Eigen::VectorXd y_fit) {
     return ss.str();
 }
 
-std::string
+gir_result
 run_iso_regression(
-    const std::string& input
+    const std::string& loss_function,
+    const std::string& input,
+    const std::string& max_iterations
 ) {
-    const auto loss_function = gir::L2();
+    // This version will return 0 on failure, which is the same as run
+    // until solution can't be improved anymore
+    uint32_t parsed_max_iterations = (uint32_t) std::atoi(max_iterations.c_str());
 
-    const auto [X, y, weight] = parse_input_data(input);
+    if (loss_function == "L2")
+        return run_iso_regression_with_loss(
+            gir::L2_WEIGHTED(),
+            input,
+            parsed_max_iterations);
+    else if (loss_function == "L1")
+        return run_iso_regression_with_loss(
+            gir::L1(),
+            input,
+            parsed_max_iterations);
+    else
+        return gir_result("ERROR: Invalid Loss Function '" + loss_function + '\'');
 
-    std::cout << "Building Adjacency Matrix" << std::endl;
-    auto [adjacency_matrix, idx_original, idx_new] =
-        gir::points_to_adjacency(X);
-
-    std::cout << "Running Isotonic Regression" << std::endl;
-
-    auto [groups, y_fit] = generalised_isotonic_regression(
-        adjacency_matrix,
-        y(idx_new),
-        weight(idx_new),
-        loss_function);
-
-    double total_loss = loss_function.loss(
-        y(idx_new),
-        y_fit,
-        weight);
-    std::cout << "Finished with total loss: " << total_loss << std::endl;
-
-    return format_output_data(groups(idx_original), y_fit(idx_original));
 }

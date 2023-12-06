@@ -62,7 +62,50 @@ define INDEX_HTML
     <title>GIR TEST</title>
   </head>
   <body>
-    <script src="girweb.js"></script>
+    <h1>Generalised Isotonic Regression</h1>
+    <form id="regression-form">
+
+        <label for="iterations">Max Iterations:</label>
+        <input type="text" id="iterations" name="iterations" value="0"><br>
+
+        <label for="loss-function">Choos a Loss Function:</label>
+        <select name="loss-function" id="loss-function">
+          <option value="L2">L2 Weighted</option>
+          <option value="L1">L1</option>
+          <option value="NotImplemented">NotImplemented</option>
+        </select><br>
+
+        <textarea id="input" name="input" rows="20" style="width: 49%;">X_1,   y
+  0,   1
+  1, 2.2
+  3, 1.1
+ 10,   5</textarea>
+        <textarea id="output" name="output" rows="20" style="width: 49%;" readonly></textarea>
+        <br>
+        <button>Run Regression</button>
+    </form>
+    <textarea id="console" name="console" rows="20" style="width: 49%;" readonly></textarea>
+    <script src="girweb.js" id="girweb-js"></script>
+    <script type="text/javascript">
+        var result
+        function validate(e){
+            result && result.delete()
+            Module.set_console_element("console")
+            var input = document.getElementById('input')
+            var loss = document.getElementById('loss-function')
+            var iterations = document.getElementById('iterations')
+            var output = document.getElementById('output')
+            result = Module.run_iso_regression(loss.value, input.value, iterations.value)
+            output.value = result.get_formatted(Math.max(result.iterations - 1, 0))
+            return false
+        }
+
+        function init(){
+            document.getElementById('regression-form').onsubmit = validate;
+        }
+
+        window.onload = init;
+    </script>
   </body>
 </html>
 endef

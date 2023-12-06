@@ -43,4 +43,4 @@ target_compile_options(
 )
 
 # -sMAIN_MODULE=2 TODO need to add more exports manually to use this but reduces size
-set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS "-Os -sWASM=1 -sFILESYSTEM=0 -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 --bind --no-entry")
+set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS "-Os -sWASM=1 -sFILESYSTEM=0 -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sEXPORTED_RUNTIME_METHODS=['UTF8ToString'] --bind --no-entry")

@@ -167,6 +167,73 @@ uint32_t count_digits(uint32_t number) {
 }
 
 std::string
+format_input_data(
+    Eigen::MatrixXd X,
+    Eigen::VectorXd y
+) {
+    const uint32_t min_column_width = 5;
+    const uint32_t precision = 2;
+    std::vector<uint32_t> column_widths(X.cols());
+
+    double integral_part;
+    for (Eigen::Index col = 0; col < X.cols(); ++col) {
+        std::modf(X.col(col).maxCoeff(), &integral_part);
+        column_widths[col] = std::max(
+            min_column_width,
+            1 + precision + count_digits(integral_part));
+    }
+
+    std::modf(y.maxCoeff(), &integral_part);
+    const uint32_t y_width = std::max(
+        min_column_width,
+        // extra 1 for decimal point
+        1 + precision + count_digits(integral_part));
+
+    // std::modf(weights.maxCoeff(), &integral_part);
+    // const uint32_t weights_width = std::max(
+    //     7,
+    //     // extra 1 for decimal point
+    //     1 + precision + count_digits(integral_part));
+
+    std::stringstream ss;
+    for (Eigen::Index col = 0; col < X.cols(); ++col) {
+        ss << std::setw(column_widths[col] - 1)
+           << "X_"
+           << col + 1
+           << ", ";
+    }
+
+    ss << std::setw(y_width)
+       << "y"
+       // << std::setw(weights_width)
+       // << "weights"
+       << std::fixed
+       << std::setprecision(precision);
+
+    auto sorted_idxs = gir::argsort(X);
+    Eigen::MatrixXd sorted_X = X(sorted_idxs, Eigen::all);
+    Eigen::VectorXd sorted_y = y(sorted_idxs);
+
+    for (size_t row = 0; row < X.rows(); ++row) {
+        ss << '\n';
+
+        for (Eigen::Index col = 0; col < X.cols(); ++col) {
+            ss << std::setw(column_widths[col])
+               << sorted_X(row, col)
+               << ", ";
+        }
+
+        ss << std::setw(y_width)
+           << sorted_y(row);
+           // << ", "
+           // << std::setw(weights_width)
+           // << weights(row);
+    }
+
+    return ss.str();
+}
+
+std::string
 format_output_data(gir::VectorXu groups, Eigen::VectorXd y_fit) {
     const uint32_t min_column_width = 5;
     const uint32_t precision = 6;
@@ -201,6 +268,15 @@ format_output_data(gir::VectorXu groups, Eigen::VectorXd y_fit) {
     }
 
     return ss.str();
+}
+
+std::string generate_input_data(
+    uint32_t total,
+    uint32_t dimensions
+) {
+    const auto [X, y] = gir::generate_monotonic_points(
+            total, 0.1, dimensions);
+    return format_input_data(X, y);
 }
 
 gir_result

@@ -50,7 +50,7 @@ class gir_result {
     gir_result(
         const uint32_t total_rows,
         const uint32_t total_columns,
-        const Eigen::VectorXd x,
+        const Eigen::MatrixXd x,
         const Eigen::VectorXd y,
         const Eigen::VectorXd weights
     ) : total_iterations(0),
@@ -133,6 +133,11 @@ class gir_result {
     }
 };
 
+std::string generate_input_data(
+    uint32_t total,
+    uint32_t dimensions
+);
+
 template<typename LossType>
 void
 run_gir (
@@ -151,9 +156,18 @@ run_gir (
     // which cut to make at each iteration
     Eigen::VectorXd group_loss = Eigen::VectorXd::Zero(total_observations);
 
-    // returned result
     gir::VectorXu groups = gir::VectorXu::Zero(total_observations);
-    Eigen::VectorXd y_fit = Eigen::VectorXd::Zero(total_observations);
+    Eigen::VectorXd y_fit = Eigen::VectorXd::Constant(
+        total_observations,
+        loss_fun.estimator(y, weights)
+    );
+
+    // Add starting point before first split
+    result.add_iteration(
+        loss_fun,
+        groups(idx_original),
+        y_fit(idx_original)
+    );
 
     // These iterations could potentially be done in parallel (except the first)
     for (uint64_t iteration = 0; max_iterations == 0 || iteration < max_iterations; ) {
@@ -197,7 +211,7 @@ run_iso_regression_with_loss(
     element_console << "Parsing Input Data" << std::endl;
     const auto [X, y, weights] = parse_input_data(input);
 
-    gir_result result(X.rows(), y.rows(), X, y, weights);
+    gir_result result(X.rows(), X.cols(), X, y, weights);
 
     element_console << "Building Adjacency Matrix" << std::endl;
     auto [adjacency_matrix, idx_original, idx_new] =
@@ -230,6 +244,7 @@ gir_result run_iso_regression(
 EMSCRIPTEN_BINDINGS(EmbindVectorDouble) {
     emscripten::function("run_iso_regression", &run_iso_regression);
     emscripten::function("set_console_element", &update_element_buffer_element_id);
+    emscripten::function("generate_input_data", &generate_input_data);
 
     emscripten::class_<gir_result>("Result")
         .property("iterations", &gir_result::iterations)

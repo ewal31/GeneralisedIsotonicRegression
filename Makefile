@@ -68,7 +68,7 @@ define INDEX_HTML
         <label for="iterations">Max Iterations:</label>
         <input type="text" id="iterations" name="iterations" value="0"><br>
 
-        <label for="loss-function">Choos a Loss Function:</label>
+        <label for="loss-function">Choose a Loss Function:</label>
         <select name="loss-function" id="loss-function">
           <option value="L2">L2 Weighted</option>
           <option value="L1">L1</option>
@@ -79,6 +79,7 @@ define INDEX_HTML
   0,   1
   1, 2.2
   3, 1.1
+  4, 1.1
  10,   5</textarea>
         <textarea id="output" name="output" rows="20" style="width: 49%;" readonly></textarea>
         <br>
@@ -97,7 +98,7 @@ define INDEX_HTML
             var output = document.getElementById('output')
             result = Module.run_iso_regression(loss.value, input.value, iterations.value)
             output.value = result.get_formatted(Math.max(result.iterations - 1, 0))
-            return false
+            return false;
         }
 
         function init(){

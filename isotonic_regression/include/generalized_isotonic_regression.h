@@ -239,7 +239,8 @@ minimum_cut(
     const VectorXu idxs
 );
 
-// TODO change return type to enum
+// TODO change return type to enum, or to return the
+// new group that was found to be optimal?
 template<typename LossType, typename int_type>
 int8_t
 gir_update (
@@ -348,8 +349,8 @@ generalised_isotonic_regression (
     Eigen::VectorXd y_fit = Eigen::VectorXd::Zero(total_observations);
 
     // These iterations could potentially be done in parallel (except the first)
-    for (uint64_t iteration = 0; max_iterations == 0 || iteration < max_iterations; ++iteration) {
-        if (gir_update(
+    for (uint64_t iteration = 0; max_iterations == 0 || iteration < max_iterations; ) {
+        const auto status = gir_update(
             adjacency_matrix,
             y,
             weights,
@@ -358,7 +359,13 @@ generalised_isotonic_regression (
             group_loss,
             groups,
             y_fit
-        )) break;
+        );
+
+        if (status == 1) {
+            ++iteration;
+        } else if (status == -1) {
+            break;
+        }
     }
 
     return std::make_pair(std::move(groups), std::move(y_fit));

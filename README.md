@@ -115,3 +115,4 @@ target_link_libraries(
 - [ ] configurable direction for monotonicity (just need to multiply by -ve 1 right?)
 - [ ] rewrite `points_to_adjacency` function to be more efficient (have 2d prototype already on branch that can handle a million points or so)
 - [ ] compare with other isotonic regression implementations
+- [ ] optional progress bar for cli would be nice

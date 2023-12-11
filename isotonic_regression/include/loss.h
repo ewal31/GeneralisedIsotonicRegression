@@ -3,6 +3,8 @@
 #include <Eigen/Core>
 
 #include <iostream>
+#include <stdlib.h>
+#include <type_traits>
 
 namespace gir {
 
@@ -10,7 +12,16 @@ Eigen::VectorXd normalise(const Eigen::VectorXd& loss_derivative);
 
 double median(Eigen::VectorXd vals);
 
-template <typename T> int sign(const Eigen::MatrixX<T>& vals) {
+template <typename T>
+int8_t sign(
+        const T val,
+        typename std::enable_if<std::is_arithmetic_v<T>>::type* = 0
+) {
+    return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
+}
+
+template <typename T> Eigen::VectorXi
+sign(const Eigen::VectorX<T>& vals) {
     return vals.unaryExp(
         [](const auto val){
             return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
@@ -30,12 +41,64 @@ class LossFunction {
             loss(y, y_fit, weights);
     }
 
+    // template <typename V = Derived>
+    // double estimator(
+    //     const Eigen::VectorXd& vals,
+    //     const Eigen::VectorXd& weights,
+    //     typename std::enable_if<std::is_member_function_pointer_v<decltype(&V::estimator)>>::type* = 0
+    // ) const
+    // {
+    //     std::cout << "Using specialised method" << std::endl;
+    //     return (static_cast<Derived const*>(this))->
+    //         estimator(vals, weights);
+    // }
+
+    // double estimator(
+    //     const Eigen::VectorXd& vals,
+    //     const Eigen::VectorXd& weights,
+    //     ...
+    // ) const
+    // {
+    //     std::cout << "Not using specialised method" << std::endl;
+    //     return binary_search_based_estimator(
+    //         vals,
+    //         weights);
+    // }
+
     double estimator(
         const Eigen::VectorXd& vals,
-        const Eigen::VectorXd& weights) const
+        const Eigen::VectorXd& weights
+    ) const
     {
         return (static_cast<Derived const*>(this))->
             estimator(vals, weights);
+    }
+
+    double binary_search_based_estimator(
+        const Eigen::VectorXd& vals,
+        const Eigen::VectorXd& weights) const
+    {
+        const double precision = 1e-9;
+        double left = vals.minCoeff();
+        double right = vals.maxCoeff();
+        double mid = (left + right) / 2;
+        double loss_left = derivative(left, vals, weights).sum();
+        double loss_mid = derivative(mid, vals, weights).sum();
+
+        while (abs(left - right) > precision) {
+
+            if (sign(loss_left) == sign(loss_mid)) {
+                left = mid;
+                loss_left = derivative(left, vals, weights).sum();
+            } else {
+                right = mid;
+            }
+
+            mid = (left + right) / 2;
+            loss_mid = derivative(mid, vals, weights).sum();
+        }
+
+        return mid;
     }
 
     Eigen::VectorXd derivative(
@@ -93,7 +156,7 @@ class L1 : public LossFunction<L1> {
         }
         return (vals.array() == loss_estimate).
             select(0, (vals.array() < loss_estimate).
-                    select(-1, Eigen::VectorXd::Ones(vals.rows())));
+                    select(-1, Eigen::VectorXd::Ones(vals.rows()))).array();
     }
 };
 
@@ -162,18 +225,20 @@ class HUBER : public LossFunction<HUBER> {
         const Eigen::VectorXd& weights) const
     {
         const Eigen::ArrayXd diff = y.array() - y_fit.array();
-        return (diff.cwiseAbs() <= delta)
+        const auto losses = (diff.cwiseAbs() <= delta)
             .select(
-                    0.5 * diff.pow(2),
-                    delta * (diff.cwiseAbs() - 0.5 * delta))
-            .sum();
+                    weights.array() * 0.5 * diff.pow(2),
+                    weights.array() * delta * (diff.cwiseAbs() - 0.5 * delta))
+            / weights.sum();
+
+        return losses.sum();
     }
 
     double estimator(
         const Eigen::VectorXd& vals,
         const Eigen::VectorXd& weights) const
     {
-        return 0; // TODO
+        return binary_search_based_estimator(vals, weights);
     }
 
     Eigen::VectorXd derivative(
@@ -184,8 +249,9 @@ class HUBER : public LossFunction<HUBER> {
         const Eigen::ArrayXd diff = vals.array() - loss_estimate;
         return (diff.cwiseAbs() <= delta)
             .select(
-                    diff,
-                    sign(diff) * delta);
+                    weights.array() * diff,
+                    weights.array() * sign(diff) * delta)
+            / weights.sum();
     }
 };
 

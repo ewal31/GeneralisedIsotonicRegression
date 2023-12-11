@@ -1184,7 +1184,7 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
         REQUIRE( X.rows() == equal_weights.rows() );
         REQUIRE( equal_weights.cols() == 1 );
 
-
+        // L2 loss without weights
         auto [groups_l2, y_fit_l2] = generalised_isotonic_regression(
             adjacency_matrix,
             sorted_ys,
@@ -1206,7 +1206,7 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
         const auto& l2_loss_weighted_deriv = gir::L2_WEIGHTED().derivative(l2_loss_weighted, sorted_ys, equal_weights);
         REQUIRE_EQUAL( l2_loss_deriv, l2_loss_weighted_deriv );
 
-
+        // L2 loss weighted
         auto [groups_l2_weighted, y_fit_l2_weighted] = generalised_isotonic_regression(
             adjacency_matrix,
             sorted_ys,
@@ -1255,5 +1255,43 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
 
         REQUIRE( (y_fit_l2_weighted_bias_up.array() >= y_fit_l2.array()).all() );
         REQUIRE( (y_fit_l2_weighted_bias_down.array() <= y_fit_l2.array()).all() );
+
+        // Huber loss without weights
+        auto [groups_huber, y_fit_huber] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            equal_weights,
+            gir::HUBER(0.1));
+
+        REQUIRE( X.rows() == y_fit_huber.rows() );
+        REQUIRE( y_fit_huber.cols() == 1 );
+
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_huber) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_huber) );
+
+        auto [groups_huber_2, y_fit_huber_2] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            equal_weights,
+            gir::HUBER(2.1));
+
+        REQUIRE( X.rows() == y_fit_huber_2.rows() );
+        REQUIRE( y_fit_huber_2.cols() == 1 );
+
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_huber_2) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_huber_2) );
+
+        // L1 loss without weights
+        // auto [groups_l1, y_fit_l1] = generalised_isotonic_regression(
+        //     adjacency_matrix,
+        //     sorted_ys,
+        //     equal_weights,
+        //     gir::L1());
+
+        // REQUIRE( X.rows() == y_fit_l1.rows() );
+        // REQUIRE( y_fit_l1.cols() == 1 );
+
+        // REQUIRE( gir::is_monotonic(sorted_points, y_fit_l1) );
+        // REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_l1) );
     }
 }

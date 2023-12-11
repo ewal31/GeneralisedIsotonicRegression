@@ -72,6 +72,7 @@ define INDEX_HTML
         <select name="loss-function" id="loss-function">
           <option value="L2">L2 Weighted</option>
           <option value="L1">L1</option>
+          <option value="HUBER">Huber</option>
           <option value="NotImplemented">NotImplemented</option>
         </select><br>
 
@@ -96,7 +97,7 @@ define INDEX_HTML
             var loss = document.getElementById('loss-function')
             var iterations = document.getElementById('iterations')
             var output = document.getElementById('output')
-            result = Module.run_iso_regression(loss.value, input.value, iterations.value)
+            result = Module.run_iso_regression(loss.value, input.value, "0.1", iterations.value)
             output.value = result.get_formatted(Math.max(result.iterations - 1, 0))
             return false;
         }

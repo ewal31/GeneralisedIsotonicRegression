@@ -111,20 +111,18 @@ class gir_result {
 
     template <typename LossType>
     void add_iteration(
-        LossType loss_function,
+        const LossType& loss_function,
         gir::VectorXu groups,
         Eigen::VectorXd y_fit
     ) {
         ++this->total_iterations;
-        this->loss.push_back(
-            loss_function.loss(y, y_fit, weights)
-        );
         this->groups.push_back(std::move(groups));
         this->y_fit.push_back(std::move(y_fit));
+        loss.push_back(this->calculate_loss(loss_function));
     }
 
     template <typename LossType>
-    double calculate_loss(LossType& loss_function) {
+    double calculate_loss(const LossType& loss_function) {
         return loss_function.loss(
             y,
             y_fit.back(),
@@ -146,7 +144,7 @@ run_gir (
     Eigen::SparseMatrix<bool>& adjacency_matrix,
     const Eigen::VectorXd& y,
     const Eigen::VectorXd& weights,
-    const gir::LossFunction<LossType> loss_fun,
+    const gir::LossFunction<LossType>& loss_fun,
     uint64_t max_iterations = 0
 ) {
     const uint64_t total_observations = y.rows();
@@ -238,6 +236,7 @@ run_iso_regression_with_loss(
 gir_result run_iso_regression(
     const std::string& loss_function,
     const std::string& input,
+    const std::string& loss_paramteter,
     const std::string& max_iterations
 );
 

@@ -76,7 +76,7 @@ adjacency_to_LP_standard_form(
     const uint64_t total_observations = considered_idxs.rows();
     const uint64_t columns = 2 * total_observations + total_constraints;
 
-    VectorXu to_reserve(columns);
+    VectorXu to_reserve = VectorXu::Zero(columns);
     for (Eigen::Index j = 0; j < 2 * total_observations; ++j) {
         to_reserve(j) = 1;
     }

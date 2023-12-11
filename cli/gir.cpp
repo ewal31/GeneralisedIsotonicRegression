@@ -195,9 +195,8 @@ int main(int argc, char** argv) {
         run(input_file, output_file, gir::L2());
     else if (parsed_loss == "L2_WEIGHTED")
         run(input_file, output_file, gir::L2_WEIGHTED());
-    // TODO not finished implementing
-    // else if (parsed_loss == "HUBER")
-    //     run(input_file, output_file, gir::HUBER(parsed_options["delta"].as<double>()));
+    else if (parsed_loss == "HUBER")
+        run(input_file, output_file, gir::HUBER(parsed_options["delta"].as<double>()));
 
     return 0;
 }

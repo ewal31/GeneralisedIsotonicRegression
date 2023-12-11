@@ -283,23 +283,34 @@ gir_result
 run_iso_regression(
     const std::string& loss_function,
     const std::string& input,
+    const std::string& loss_parameter,
     const std::string& max_iterations
 ) {
     // This version will return 0 on failure, which is the same as run
     // until solution can't be improved anymore
     uint32_t parsed_max_iterations = (uint32_t) std::atoi(max_iterations.c_str());
 
-    if (loss_function == "L2")
+    if (loss_function == "L2") {
+        element_console << "Running with L2 Loss (Weighted)" << std::endl;
         return run_iso_regression_with_loss(
             gir::L2_WEIGHTED(),
             input,
             parsed_max_iterations);
-    else if (loss_function == "L1")
+    } else if (loss_function == "L1") {
+        element_console << "Running with L1 Loss (Not-Weighted)" << std::endl;
         return run_iso_regression_with_loss(
             gir::L1(),
             input,
             parsed_max_iterations);
-    else
+    } else if (loss_function == "HUBER") {
+        const auto delta = std::stod(std::string(loss_parameter));
+        element_console << "Running with Huber Loss delta=" << delta << " (Not-Weighted)" << std::endl;
+        return run_iso_regression_with_loss(
+            gir::HUBER(delta),
+            input,
+            parsed_max_iterations);
+    } else {
         return gir_result("ERROR: Invalid Loss Function '" + loss_function + '\'');
+    }
 
 }

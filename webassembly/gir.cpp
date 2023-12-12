@@ -291,7 +291,7 @@ run_iso_regression(
     uint32_t parsed_max_iterations = (uint32_t) std::atoi(max_iterations.c_str());
 
     if (loss_function == "L2") {
-        element_console << "Running with L2 Loss (Weighted)" << std::endl;
+        element_console << "Running with L2 Loss" << std::endl;
         return run_iso_regression_with_loss(
             gir::L2_WEIGHTED(),
             input,
@@ -304,7 +304,7 @@ run_iso_regression(
             parsed_max_iterations);
     } else if (loss_function == "HUBER") {
         const auto delta = std::stod(std::string(loss_parameter));
-        element_console << "Running with Huber Loss delta=" << delta << " (Not-Weighted)" << std::endl;
+        element_console << "Running with Huber Loss delta=" << delta << std::endl;
         return run_iso_regression_with_loss(
             gir::HUBER(delta),
             input,

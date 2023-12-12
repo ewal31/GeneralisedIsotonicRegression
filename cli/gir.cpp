@@ -19,7 +19,10 @@ uint64_t read_total_lines(const std::string& input_file) {
 }
 
 std::tuple<Eigen::MatrixXd, Eigen::VectorXd, Eigen::VectorXd>
-read_input_data(std::string input_file) {
+read_input_data(
+    const std::string& input_file,
+    const std::string& monotonicity_modifier
+) {
     const auto total_lines = read_total_lines(input_file);
     const auto total_values = total_lines - 1;
 
@@ -62,6 +65,55 @@ read_input_data(std::string input_file) {
             std::cout << ", but no weights." << std::endl;
     }
 
+    std::vector<int> monotonicity_mult(X_columns.size(), 1);
+
+    if (monotonicity_modifier.size() > 0) {
+        size_t pos = 0;
+        for (int i = 0; i < X_columns.size(); ++i) {
+            try {
+                if (monotonicity_modifier[pos] == ',') {
+                    ++pos;
+                }
+
+                if (pos >= monotonicity_modifier.size()) {
+                    std::cout << "Invalid Monotonicity Direction Argument: -m '";
+                    std::cout << monotonicity_modifier << "'\n";
+                    std::cout << "Not enough arguments for columns in :";
+                    std::cout << input_file << std::endl;
+                    exit(1);
+                }
+
+                size_t pos_adj;
+                int parsed = std::stoi(monotonicity_modifier.substr(pos), &pos_adj);
+                pos += pos_adj;
+
+                if (parsed == 1 || parsed == -1) {
+                    monotonicity_mult[i] = parsed;
+                } else {
+                    std::cout << "Invalid Monotonicity Direction Argument: -m '";
+                    std::cout << monotonicity_modifier << "'\n";
+                    std::cout << "Expecting arguments of the form '-m -1,1,1,-1'\n";
+                    std::cout << "Found '" << parsed << '\'' << std::endl;
+                    exit(1);
+                }
+            }
+            catch (const std::exception& e) {
+                std::cout << "Invalid Monotonicity Direction Argument: -m '";
+                std::cout << monotonicity_modifier << "'\n";
+                std::cout << "Expecting arguments of the form '-m -1,1,1,-1'" << std::endl;
+                exit(1);
+            }
+        }
+
+        if (pos < monotonicity_modifier.size()) {
+            std::cout << "Invalid Monotonicity Direction Argument: -m '";
+            std::cout << monotonicity_modifier << "'\n";
+            std::cout << ": contains more arguments than columns in ";
+            std::cout << input_file << std::endl;
+            exit(1);
+        }
+    }
+
     Eigen::MatrixXd X(total_values, X_columns.size());
     Eigen::VectorXd y(total_values);
     Eigen::VectorXd weight = Eigen::VectorXd::Ones(total_values);
@@ -75,6 +127,10 @@ read_input_data(std::string input_file) {
         if (has_weights)
             weight(row) = file_row["weight"].get<double>();
         ++row;
+    }
+
+    for (int col = 0; col < X.cols(); ++col) {
+        X(Eigen::all, col) *= monotonicity_mult[col];
     }
 
     return std::make_tuple(std::move(X), std::move(y), std::move(weight));
@@ -100,7 +156,7 @@ void write_result(
 
 int main(int argc, char** argv) {
     std::vector<std::string> loss_functions {
-        "L1", "L2", "L2_WEIGHTED" //, "HUBER"
+        "L1", "L2", "L2_WEIGHTED", "HUBER"
     };
 
     std::string loss_functions_string = "Loss Function [";
@@ -124,7 +180,8 @@ int main(int argc, char** argv) {
         ("i,input", "Input File", cxxopts::value<std::string>())
         ("o,output", "Output File", cxxopts::value<std::string>())
         ("l,loss", loss_functions_string, cxxopts::value<std::string>()->default_value("L2"))
-        ("delta", "Huber Loss Delta", cxxopts::value<double>()->default_value("1."))
+        ("delta", "Huber Loss Delta", cxxopts::value<double>()->default_value("1.0"))
+        ("m,monotonicity", "Comma separated monotonicity direction for each column of X: '1' for ascending, '-1' for descending. (default: ascending)", cxxopts::value<std::string>())
         ("h,help", "Print usage");
 
     std::vector<std::string> required_options {
@@ -183,6 +240,11 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    std::string monotonicity_modifier;
+    if (parsed_options.count("monotonicity")) {
+        monotonicity_modifier = parsed_options["monotonicity"].as<std::string>();
+    }
+
     std::cout << "Running " << options.program();
     std::cout << " with loss function '" << parsed_loss << "' on\n";
     std::cout << ">> '" << input_file << "'\n";
@@ -190,14 +252,13 @@ int main(int argc, char** argv) {
     std::cout << ">> '" << output_file << "'" << std::endl;
 
     if (parsed_loss == "L1")
-        run(input_file, output_file, gir::L1());
+        run(input_file, output_file, monotonicity_modifier, gir::L1());
     else if (parsed_loss == "L2")
-        run(input_file, output_file, gir::L2());
+        run(input_file, output_file, monotonicity_modifier, gir::L2());
     else if (parsed_loss == "L2_WEIGHTED")
-        run(input_file, output_file, gir::L2_WEIGHTED());
-    // TODO not finished implementing
-    // else if (parsed_loss == "HUBER")
-    //     run(input_file, output_file, gir::HUBER(parsed_options["delta"].as<double>()));
+        run(input_file, output_file, monotonicity_modifier, gir::L2_WEIGHTED());
+    else if (parsed_loss == "HUBER")
+        run(input_file, output_file, monotonicity_modifier, gir::HUBER(parsed_options["delta"].as<double>()));
 
     return 0;
 }

@@ -1,6 +1,15 @@
+if (EMSCRIPTEN)
+    # 64bit might work if we add -sWASM_BIGINT
+    set(HIGHSINT64 OFF CACHE INTERNAL "Use 32 bit integers indexing")
+
+else ()
+    set(HIGHSINT64 ON CACHE INTERNAL "Use 64 bit integers indexing")
+
+endif ()
+
+
 set(FAST_BUILD ON CACHE INTERNAL "Fast Build")
 set(BUILD_EXAMPLES OFF CACHE INTERNAL "Build examples")
-set(HIGHSINT64 ON CACHE INTERNAL "Use 64 bit integers indexing")
 
 FetchContent_Declare(
     HIGHS

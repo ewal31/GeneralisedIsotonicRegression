@@ -33,7 +33,7 @@ VectorXu argsort(const Eigen::Matrix<V, Eigen::Dynamic, Eigen::Dynamic>& mat) {
         idxs.begin(),
         idxs.end(),
         [&mat](const auto i, const auto j){
-        Eigen::Index col = 0;
+            Eigen::Index col = 0;
             while (col < mat.cols()) {
                 if ( mat(i, col) != mat(j, col) )
                     return mat(i, col) < mat(j, col);

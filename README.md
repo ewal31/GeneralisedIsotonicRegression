@@ -34,10 +34,15 @@ The built cli tool can then be found at `build/cli/gir`
 Usage:
   gir [OPTION...]
 
-  -i, --input arg   Input File
-  -o, --output arg  Output File
-  -l, --loss arg    Loss Function [L2_WEIGHTED|L2] (default: L2)
-  -h, --help        Print usage
+  -i, --input arg         Input File
+  -o, --output arg        Output File
+  -l, --loss arg          Loss Function [L1|L2|L2_WEIGHTED|HUBER] (default:
+                          L2)
+      --delta arg         Huber Loss Delta (default: 1.0)
+  -m, --monotonicity arg  Comma separated monotonicity direction for each
+                          column of X: '1' for ascending, '-1' for
+                          descending. (default: ascending)
+  -h, --help              Print usage
 ```
 
 Create a file `input.csv` with the following contents.
@@ -67,6 +72,13 @@ or to use a weighted L\_2 norm
 gir -l L2_WEIGHTED -i input.csv -o output.csv
 ```
 
+alternatively, to specificy monotonicity should be maintained in the opposite
+direction
+
+```bash
+gir -i input.csv -o output.csv -m -1,-1
+```
+
 ## Library
 
 The library can be included in CMake projects by including the following snippet.
@@ -77,7 +89,7 @@ include(FetchContent)
 FetchContent_Declare(
     GIR
     GIT_REPOSITORY "https://github.com/ewal31/GeneralisedIsotonicRegression"
-    GIT_TAG 0.1.1
+    GIT_TAG 0.2.0
     GIT_SHALLOW TRUE
 )
 
@@ -91,6 +103,31 @@ target_link_libraries(
     isotonic_regression
 )
 ```
+
+The main functions of interest are then
+
+```cpp
+template<typename V>
+std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
+points_to_adjacency(
+    const Eigen::MatrixX<V>& points
+)
+```
+
+and
+
+```cpp
+std::pair<VectorXu, Eigen::VectorXd>
+generalised_isotonic_regression (
+    const Eigen::SparseMatrix<bool>& adjacency_matrix,
+    YType&& _y,
+    WeightsType&& _weights,
+    const LossFunction<LossType>& loss_fun,
+    uint64_t max_iterations = 0
+)
+```
+
+An example can be found in [example/main.cpp](./example/main.cpp).
 
 ## Dependencies
 
@@ -112,6 +149,8 @@ target_link_libraries(
 - [x] tests for duplicate points
 - [ ] more loss functions
 - [ ] tests for really small weights or weights of 0
-- [ ] configurable direction for monotonicity (just need to multiply by -ve 1 right?)
+- [x] configurable direction for monotonicity in cli (just need to multiply by -ve 1 right?)
 - [ ] rewrite `points_to_adjacency` function to be more efficient (have 2d prototype already on branch that can handle a million points or so)
-- [ ] compare with other isotonic regression implementations
+- [ ] compare more thoroughly with other isotonic regression implementations
+- [ ] optional progress bar for cli would be nice
+- [ ] add Python interface

@@ -9,6 +9,14 @@
 
 namespace gir {
 
+#ifdef __EMSCRIPTEN__
+using HiGHS_Index = int32_t;
+
+#else
+using HiGHS_Index = int64_t;
+
+#endif
+
 std::pair<Eigen::MatrixXd, Eigen::VectorXd>
 generate_monotonic_points(uint64_t total, double sigma, uint64_t dimensions) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -68,7 +76,7 @@ adjacency_to_LP_standard_form(
     const uint64_t total_observations = considered_idxs.rows();
     const uint64_t columns = 2 * total_observations + total_constraints;
 
-    VectorXu to_reserve(columns);
+    VectorXu to_reserve = VectorXu::Zero(columns);
     for (Eigen::Index j = 0; j < 2 * total_observations; ++j) {
         to_reserve(j) = 1;
     }
@@ -147,8 +155,8 @@ minimum_cut(
     // TODO instead of building an Eigen::SparseMatrix and then converting
     // it again here, could just directly build it in this format.
     // Might be harder to understand though.
-    std::vector<int64_t> column_start_positions(A.cols() + 1);
-    std::vector<int64_t> nonzero_row_index(A.nonZeros());
+    std::vector<HiGHS_Index> column_start_positions(A.cols() + 1);
+    std::vector<HiGHS_Index> nonzero_row_index(A.nonZeros());
     std::vector<double> nonzero_values(A.nonZeros());
     uint64_t idx = 0;
     for (Eigen::Index j = 0; j < A.outerSize(); ++j) {

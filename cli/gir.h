@@ -10,7 +10,10 @@
 uint64_t read_total_lines(const std::string& input_file);
 
 std::tuple<Eigen::MatrixXd, Eigen::VectorXd, Eigen::VectorXd>
-read_input_data(std::string input_file);
+read_input_data(
+    const std::string& input_file,
+    const std::string& monotonicity_modifier
+);
 
 void write_result(
     const std::string& output_file,
@@ -22,10 +25,11 @@ template <typename LossType>
 void run(
     const std::string& input_file,
     const std::string& output_file,
-    const gir::LossFunction<LossType> loss_function
+    const std::string& monotonicity_modifier,
+    const gir::LossFunction<LossType>& loss_function
 ) {
     std::cout << "Reading Input" << std::endl;
-    const auto [X, y, weight] = read_input_data(input_file);
+    const auto [X, y, weight] = read_input_data(input_file, monotonicity_modifier);
 
     std::cout << "Building Adjacency Matrix" << std::endl;
     auto [adjacency_matrix, idx_original, idx_new] =

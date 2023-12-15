@@ -69,9 +69,45 @@ uint64_t constraints_count(
 
 template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
+points_to_adjacency_1d(const Eigen::MatrixX<V>& points) {
+    const uint64_t total_points = points.rows();
+
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
+    adjacency.reserve(Eigen::VectorXi::Constant(total_points, 2));
+
+    const auto sorted_idxs = argsort(points);
+    const Eigen::MatrixX<V> sorted_points = points(sorted_idxs, Eigen::all);
+
+    bool has_equal_chain = false;
+    Eigen::Index first_equal_index = 0;
+    for (Eigen::Index j = 1; j < total_points; ++j) {
+        const auto p1 = sorted_points(j-1, Eigen::all);
+        const auto p2 = sorted_points(j, Eigen::all);
+
+        if (!has_equal_chain && p1 == p2) {
+            has_equal_chain = true;
+            first_equal_index = j-1;
+        } else if (has_equal_chain && p1 != p2) {
+            has_equal_chain = false;
+            adjacency.insert(j-1, first_equal_index) = 1;
+        }
+
+        adjacency.insert(j-1, j) = 1;
+    }
+
+    // Finalise Adjacency and Point Index Mappings
+    adjacency.makeCompressed();
+
+    return std::make_tuple(
+        std::move(adjacency),
+        std::move(argsort(sorted_idxs)),
+        std::move(sorted_idxs));
+}
+
+template<typename V>
+std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency_2d(const Eigen::MatrixX<V>& points) {
     const uint64_t total_points = points.rows();
-    const uint64_t dimensions = points.cols();
 
     Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
     adjacency.reserve(Eigen::VectorXi::Constant(total_points, 30 ? 30 < total_points : total_points));
@@ -326,7 +362,9 @@ template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency(const Eigen::MatrixX<V>& points) {
 
-    if (points.cols() == 2) {
+    if (points.cols() == 1) {
+        return points_to_adjacency_1d(points);
+    } else if (points.cols() == 2) {
         return points_to_adjacency_2d(points);
     } else {
         return points_to_adjacency_N_brute_force(points);

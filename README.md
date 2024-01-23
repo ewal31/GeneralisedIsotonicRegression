@@ -150,7 +150,12 @@ An example can be found in [example/main.cpp](./example/main.cpp).
 - [ ] more loss functions
 - [ ] tests for really small weights or weights of 0
 - [x] configurable direction for monotonicity in cli (just need to multiply by -ve 1 right?)
-- [ ] rewrite `points_to_adjacency` function to be more efficient (have 2d prototype already on branch that can handle a million points or so)
+- [ ] rewrite `points_to_adjacency` function to be more efficient
+    - [x] 1d
+    - [ ] 2d
+    - [ ] 3 and more dimensions
 - [ ] compare more thoroughly with other isotonic regression implementations
-- [ ] optional progress bar for cli would be nice
+- [ ] add more information for users of cli tool
+    - [ ] optional progress bar for cli would be nice
+    - [ ] option for saving all iterative solutions
 - [ ] add Python interface

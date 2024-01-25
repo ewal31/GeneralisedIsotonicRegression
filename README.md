@@ -147,7 +147,7 @@ An example can be found in [example/main.cpp](./example/main.cpp).
 
 - [x] rewrite loss functions code to allow for more to be added and so they can be configured
 - [x] tests for duplicate points
-- [ ] more loss functions
+- [x] more loss functions
 - [ ] tests for really small weights or weights of 0
 - [x] configurable direction for monotonicity in cli (just need to multiply by -ve 1 right?)
 - [ ] rewrite `points_to_adjacency` function to be more efficient

@@ -1386,7 +1386,7 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
         // Poisson loss without weights
         auto [groups_poisson, y_fit_poisson] = generalised_isotonic_regression(
             adjacency_matrix,
-            sorted_ys,
+            sorted_ys.array() + abs(sorted_ys.minCoeff()) + 1e-12, // Only positives
             equal_weights,
             gir::POISSON());
 
@@ -1401,7 +1401,7 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
             adjacency_matrix,
             sorted_ys,
             equal_weights,
-            gir::PNORM(2.5));
+            gir::PNORM(1.5));
 
         REQUIRE( X.rows() == y_fit_pnorm.rows() );
         REQUIRE( y_fit_pnorm.cols() == 1 );
@@ -1413,7 +1413,7 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
             adjacency_matrix,
             sorted_ys,
             equal_weights,
-            gir::PNORM(1.5));
+            gir::PNORM(1.1));
 
         REQUIRE( X.rows() == y_fit_pnorm_2.rows() );
         REQUIRE( y_fit_pnorm_2.cols() == 1 );
@@ -1421,6 +1421,17 @@ TEST_CASE( "comparing loss functions", "[isotonic_regression]" ) {
         REQUIRE( gir::is_monotonic(sorted_points, y_fit_pnorm_2) );
         REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_pnorm_2) );
 
+        auto [groups_pnorm_3, y_fit_pnorm_3] = generalised_isotonic_regression(
+            adjacency_matrix,
+            sorted_ys,
+            equal_weights,
+            gir::PNORM(1.9));
+
+        REQUIRE( X.rows() == y_fit_pnorm_3.rows() );
+        REQUIRE( y_fit_pnorm_3.cols() == 1 );
+
+        REQUIRE( gir::is_monotonic(sorted_points, y_fit_pnorm_3) );
+        REQUIRE( gir::is_monotonic(adjacency_matrix, y_fit_pnorm_3) );
 
         // L1 loss without weights
         // auto [groups_l1, y_fit_l1] = generalised_isotonic_regression(

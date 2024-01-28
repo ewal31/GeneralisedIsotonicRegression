@@ -273,8 +273,7 @@ class POISSON : public LossFunction<POISSON> {
         const Eigen::VectorXd& weights) const
     {
         // TODO What is the correct estimator?
-        // return weights.cwiseProduct(vals).sum() / weights.sum();
-        return binary_search_based_estimator(vals, weights);
+        return weights.cwiseProduct(vals).sum() / weights.sum();
     }
 
     Eigen::VectorXd derivative(
@@ -289,7 +288,7 @@ class POISSON : public LossFunction<POISSON> {
         // d/dy => w_i - w_i y_i / y^
 
         // TODO How should I handle the hopefully unlikely divide by zero
-        return weights.array() * ( 1 - vals.array() / loss_estimate );
+        return weights.array() * ( vals.array() / loss_estimate - 1 );
     }
 };
 
@@ -305,10 +304,9 @@ class PNORM : public LossFunction<PNORM> {
         const Eigen::VectorXd& weights) const
     {
         // p-norm
-        // w_i (y_i - y^)^p
-        const auto losses = weights.array() * (
-            y.array() - y_fit.array()
-        ).pow(p);
+        // w_i | y_i - y^ | ^ p    1 < p < 2
+        const auto losses = weights.array() *
+            (y.array() - y_fit.array()).cwiseAbs().pow(p);
         return losses.sum();
     }
 
@@ -324,7 +322,8 @@ class PNORM : public LossFunction<PNORM> {
         const Eigen::VectorXd& vals,
         const Eigen::VectorXd& weights) const
     {
-        return -1 * p * (vals.array() - loss_estimate).pow(p - 1) * weights.array();
+        const auto diffs = vals.array() - loss_estimate;
+        return p * diffs.cwiseAbs().pow(p-1) * sign(diffs);
     }
 };
 

@@ -89,7 +89,7 @@ include(FetchContent)
 FetchContent_Declare(
     GIR
     GIT_REPOSITORY "https://github.com/ewal31/GeneralisedIsotonicRegression"
-    GIT_TAG 0.2.0
+    GIT_TAG 0.3.0
     GIT_SHALLOW TRUE
 )
 

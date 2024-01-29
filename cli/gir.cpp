@@ -156,7 +156,7 @@ void write_result(
 
 int main(int argc, char** argv) {
     std::vector<std::string> loss_functions {
-        "L1", "L2", "L2_WEIGHTED", "HUBER"
+        "L1", "L2", "L2_WEIGHTED", "HUBER", "POISSON", "PNORM"
     };
 
     std::string loss_functions_string = "Loss Function [";
@@ -181,6 +181,7 @@ int main(int argc, char** argv) {
         ("o,output", "Output File", cxxopts::value<std::string>())
         ("l,loss", loss_functions_string, cxxopts::value<std::string>()->default_value("L2"))
         ("delta", "Huber Loss Delta", cxxopts::value<double>()->default_value("1.0"))
+        ("p", "p-Norm Loss p value (1 < p < 2)", cxxopts::value<double>()->default_value("1.5"))
         ("m,monotonicity", "Comma separated monotonicity direction for each column of X: '1' for ascending, '-1' for descending. (default: ascending)", cxxopts::value<std::string>())
         ("h,help", "Print usage");
 
@@ -259,6 +260,10 @@ int main(int argc, char** argv) {
         run(input_file, output_file, monotonicity_modifier, gir::L2_WEIGHTED());
     else if (parsed_loss == "HUBER")
         run(input_file, output_file, monotonicity_modifier, gir::HUBER(parsed_options["delta"].as<double>()));
+    else if (parsed_loss == "POISSON")
+        run(input_file, output_file, monotonicity_modifier, gir::POISSON());
+    else if (parsed_loss == "PNORM")
+        run(input_file, output_file, monotonicity_modifier, gir::PNORM(parsed_options["p"].as<double>()));
 
     return 0;
 }

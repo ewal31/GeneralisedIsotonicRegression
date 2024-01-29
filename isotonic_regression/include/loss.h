@@ -255,4 +255,76 @@ class HUBER : public LossFunction<HUBER> {
     }
 };
 
+class POISSON : public LossFunction<POISSON> {
+ public:
+    double loss(
+        const Eigen::VectorXd& y,
+        const Eigen::VectorXd& y_fit,
+        const Eigen::VectorXd& weights) const
+    {
+        const auto losses = weights.array() * (
+            y_fit.array() - y.array() * y_fit.array().log()
+        );
+        return losses.sum();
+    }
+
+    double estimator(
+        const Eigen::VectorXd& vals,
+        const Eigen::VectorXd& weights) const
+    {
+        // TODO What is the correct estimator?
+        return weights.cwiseProduct(vals).sum() / weights.sum();
+    }
+
+    Eigen::VectorXd derivative(
+        const double loss_estimate,
+        const Eigen::VectorXd& vals,
+        const Eigen::VectorXd& weights) const
+    {
+        // Negative pseudo Poisson Log-Likelihood
+        //
+        // w_i ( y^ - y_i ln (y^) )
+        //
+        // d/dy => w_i - w_i y_i / y^
+
+        // TODO How should I handle the hopefully unlikely divide by zero
+        return weights.array() * ( vals.array() / loss_estimate - 1 );
+    }
+};
+
+class PNORM : public LossFunction<PNORM> {
+ private:
+    const double p;
+ public:
+    explicit PNORM(const double p): p(p) {}
+
+    double loss(
+        const Eigen::VectorXd& y,
+        const Eigen::VectorXd& y_fit,
+        const Eigen::VectorXd& weights) const
+    {
+        // p-norm
+        // w_i | y_i - y^ | ^ p    1 < p < 2
+        const auto losses = weights.array() *
+            (y.array() - y_fit.array()).cwiseAbs().pow(p);
+        return losses.sum();
+    }
+
+    double estimator(
+        const Eigen::VectorXd& vals,
+        const Eigen::VectorXd& weights) const
+    {
+        return binary_search_based_estimator(vals, weights);
+    }
+
+    Eigen::VectorXd derivative(
+        const double loss_estimate,
+        const Eigen::VectorXd& vals,
+        const Eigen::VectorXd& weights) const
+    {
+        const auto diffs = vals.array() - loss_estimate;
+        return p * diffs.cwiseAbs().pow(p-1) * sign(diffs);
+    }
+};
+
 } // namespace gir

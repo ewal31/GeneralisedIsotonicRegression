@@ -41,6 +41,7 @@ class gir_result {
     const Eigen::MatrixXd x;
     const Eigen::VectorXd y;
     const Eigen::VectorXd weights;
+    const gir::VectorXu idx_original;
     std::vector<gir::VectorXu> groups;
     std::vector<Eigen::VectorXd> y_fit;
     std::vector<double> loss;
@@ -51,14 +52,16 @@ class gir_result {
         const uint32_t total_rows,
         const uint32_t total_columns,
         const Eigen::MatrixXd x,
-        const Eigen::VectorXd y,
-        const Eigen::VectorXd weights
+        const Eigen::VectorXd& y,
+        const Eigen::VectorXd& weights,
+        const gir::VectorXu& idx_original
     ) : total_iterations(0),
         total_rows(total_rows),
         total_columns(total_columns),
         x(x),
         y(y),
-        weights(weights)
+        weights(weights),
+        idx_original(idx_original)
     {}
 
     gir_result(
@@ -102,7 +105,14 @@ class gir_result {
     }
 
     std::string get_formatted(uint32_t iteration) const {
-        return total_rows == 0 ? status : format_output_data(groups[iteration], y_fit[iteration]);
+        if (total_rows == 0) {
+            return status;
+        } else {
+            return format_output_data(
+                groups[iteration](idx_original),
+                y_fit[iteration](idx_original)
+            );
+        }
     }
 
     void set_status(std::string& status) {
@@ -112,12 +122,12 @@ class gir_result {
     template <typename LossType>
     void add_iteration(
         const LossType& loss_function,
-        gir::VectorXu groups,
-        Eigen::VectorXd y_fit
+        gir::VectorXu& groups,
+        Eigen::VectorXd& y_fit
     ) {
         ++this->total_iterations;
-        this->groups.push_back(std::move(groups));
-        this->y_fit.push_back(std::move(y_fit));
+        this->groups.push_back(groups);
+        this->y_fit.push_back(y_fit);
         loss.push_back(this->calculate_loss(loss_function));
     }
 
@@ -163,8 +173,8 @@ run_gir (
     // Add starting point before first split
     result.add_iteration(
         loss_fun,
-        groups(idx_original),
-        y_fit(idx_original)
+        groups,
+        y_fit
     );
 
     // These iterations could potentially be done in parallel (except the first)
@@ -184,8 +194,8 @@ run_gir (
             ++iteration;
             result.add_iteration(
                 loss_fun,
-                groups(idx_original),
-                y_fit(idx_original)
+                groups,
+                y_fit
             );
             element_console
                 << "Completed iteration: "
@@ -209,11 +219,21 @@ run_iso_regression_with_loss(
     element_console << "Parsing Input Data" << std::endl;
     const auto [X, y, weights] = parse_input_data(input);
 
-    gir_result result(X.rows(), X.cols(), X, y, weights);
-
     element_console << "Building Adjacency Matrix" << std::endl;
     auto [adjacency_matrix, idx_original, idx_new] =
         gir::points_to_adjacency(X);
+
+    Eigen::VectorXd reordered_y = y(idx_new);
+    Eigen::VectorXd reordered_weights = weights(idx_new);
+
+    gir_result result(
+        X.rows(),
+        X.cols(),
+        X(idx_new, Eigen::all),
+        reordered_y,
+        reordered_weights,
+        idx_original
+    );
 
     element_console << "Running Isotonic Regression" << std::endl;
 
@@ -221,8 +241,8 @@ run_iso_regression_with_loss(
         result,
         idx_original,
         adjacency_matrix,
-        y,
-        weights,
+        reordered_y,
+        reordered_weights,
         loss_function,
         max_iterations
     );

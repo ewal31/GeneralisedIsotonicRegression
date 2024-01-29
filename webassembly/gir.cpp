@@ -276,7 +276,8 @@ std::string generate_input_data(
 ) {
     const auto [X, y] = gir::generate_monotonic_points(
             total, 0.1, dimensions);
-    return format_input_data(X, y);
+    // Not all loss functions like negatives and zeros.
+    return format_input_data(X, y.array() + abs(y.minCoeff()) + 1e-12);
 }
 
 gir_result
@@ -307,6 +308,19 @@ run_iso_regression(
         element_console << "Running with Huber Loss delta=" << delta << std::endl;
         return run_iso_regression_with_loss(
             gir::HUBER(delta),
+            input,
+            parsed_max_iterations);
+    } else if (loss_function == "POISSON") {
+        element_console << "Running with Poisson Loss" << std::endl;
+        return run_iso_regression_with_loss(
+            gir::POISSON(),
+            input,
+            parsed_max_iterations);
+    } else if (loss_function == "PNORM") {
+        const auto p = std::stod(std::string(loss_parameter));
+        element_console << "Running with p-Norm Loss p=" << p << std::endl;
+        return run_iso_regression_with_loss(
+            gir::PNORM(p),
             input,
             parsed_max_iterations);
     } else {

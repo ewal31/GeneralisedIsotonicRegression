@@ -73,6 +73,8 @@ define INDEX_HTML
           <option value="L2">L2 Weighted</option>
           <option value="L1">L1</option>
           <option value="HUBER">Huber</option>
+          <option value="POISSON">Poisson</option>
+          <option value="PNORM">p-Norm</option>
           <option value="NotImplemented">NotImplemented</option>
         </select><br>
 

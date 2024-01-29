@@ -89,7 +89,7 @@ include(FetchContent)
 FetchContent_Declare(
     GIR
     GIT_REPOSITORY "https://github.com/ewal31/GeneralisedIsotonicRegression"
-    GIT_TAG 0.2.0
+    GIT_TAG 0.3.0
     GIT_SHALLOW TRUE
 )
 
@@ -147,10 +147,15 @@ An example can be found in [example/main.cpp](./example/main.cpp).
 
 - [x] rewrite loss functions code to allow for more to be added and so they can be configured
 - [x] tests for duplicate points
-- [ ] more loss functions
+- [x] more loss functions
 - [ ] tests for really small weights or weights of 0
 - [x] configurable direction for monotonicity in cli (just need to multiply by -ve 1 right?)
-- [ ] rewrite `points_to_adjacency` function to be more efficient (have 2d prototype already on branch that can handle a million points or so)
+- [ ] rewrite `points_to_adjacency` function to be more efficient
+    - [x] 1d
+    - [x] 2d
+    - [ ] 3 and more dimensions
 - [ ] compare more thoroughly with other isotonic regression implementations
-- [ ] optional progress bar for cli would be nice
+- [ ] add more information for users of cli tool
+    - [ ] optional progress bar for cli would be nice
+    - [ ] option for saving all iterative solutions like online tool
 - [ ] add Python interface

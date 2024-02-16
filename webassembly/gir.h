@@ -179,7 +179,7 @@ run_gir (
 
     // These iterations could potentially be done in parallel (except the first)
     for (uint64_t iteration = 0; max_iterations == 0 || iteration < max_iterations; ) {
-        const auto status = gir_update(
+        const gir::IterationResult status = gir_update(
             adjacency_matrix,
             y,
             weights,
@@ -190,7 +190,7 @@ run_gir (
             y_fit
         );
 
-        if (status == 1) {
+        if (status == gir::IterationResult::improved) {
             ++iteration;
             result.add_iteration(
                 loss_fun,
@@ -203,7 +203,7 @@ run_gir (
                 << " with loss: "
                 << result.get_loss(result.iterations() - 1)
                 << std::endl;
-        } else if (status == -1) {
+        } else if (status == gir::IterationResult::optimal) {
             return;
         }
     }

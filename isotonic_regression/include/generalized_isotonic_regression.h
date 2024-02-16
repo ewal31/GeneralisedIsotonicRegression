@@ -107,6 +107,8 @@ points_to_adjacency_1d(const Eigen::MatrixX<V>& points) {
 template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency_2d(const Eigen::MatrixX<V>& points) {
+    // brings total comparisons down to about 1/4 of brute force solution
+
     const uint64_t total_points = points.rows();
 
     Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
@@ -205,11 +207,10 @@ points_to_adjacency_N_brute_force(const Eigen::MatrixX<V>& points) {
     // the memory usage seems fine though.
     // ideas:
     // * sorted idxs along each axis then can just move to the next point
-    //   and shouldn't need to do all the n comparisons each time?
-    // * maybe something from computational geometry?
-    // * not sure how eigen goes multithreaded?
+    //   and shouldn't need to do all the n comparisons each time? (kinda like merge sort)
     // * keep tree of linked points so can run from newest backwards and save on comparisons
-    // * some sort of topological sort?
+    // * it is also equivalent to finding all optimals points in a pareto optimisation problem
+    //   which just has a bad computational complexity. But can still be better than n^2
 
     const uint64_t total_points = points.rows();
     const auto& sorted_idxs = argsort(points);
@@ -361,7 +362,6 @@ points_to_adjacency_N_brute_force(const Eigen::MatrixX<V>& points) {
 template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency(const Eigen::MatrixX<V>& points) {
-
     if (points.cols() == 1) {
         return points_to_adjacency_1d(points);
     } else if (points.cols() == 2) {
@@ -369,9 +369,10 @@ points_to_adjacency(const Eigen::MatrixX<V>& points) {
     } else {
         return points_to_adjacency_N_brute_force(points);
     }
-
 }
 
+// TODO this function isn't necessary in it's current form. Instead of building
+// the sparse matrix, we should just directly construct what is needed by HiGHs
 Eigen::SparseMatrix<int>
 adjacency_to_LP_standard_form(
     const Eigen::SparseMatrix<bool>& adjacency_matrix,
@@ -385,10 +386,14 @@ minimum_cut(
     const VectorXu idxs
 );
 
-// TODO change return type to enum, or to return the
-// new group that was found to be optimal?
+enum IterationResult {
+    optimal,
+    unchanged,
+    improved
+};
+
 template<typename LossType, typename int_type>
-int8_t
+IterationResult
 gir_update (
     const Eigen::SparseMatrix<bool>& adjacency_matrix,
     const Eigen::VectorXd& y,
@@ -404,7 +409,7 @@ gir_update (
     auto [max_cut_value, max_cut_idx] = argmax(group_loss);
 
     if (max_cut_value == sentinal) {
-        return -1; // optimal
+        return IterationResult::optimal;
     }
 
     VectorXu considered_idxs = find(groups,
@@ -423,7 +428,7 @@ gir_update (
     if (zero_loss) {
         group_loss(considered_idxs).array() = sentinal;
         y_fit(considered_idxs).array() = estimator;
-        return 0; // nothing changed
+        return IterationResult::unchanged;
 
     } else if (no_constraints) {
         group_loss(considered_idxs).array() = sentinal;
@@ -433,13 +438,11 @@ gir_update (
                     y(idx, Eigen::all), weights(idx, Eigen::all));
             groups(idx) = ++group_count;
         }
-        // y_fit(considered_idxs).array() = estimator;
-        // groups(considered_idxs).array() = ++group_count;
-        return 1; // something changed
+        return IterationResult::improved;
 
     } else {
         const auto solution =
-            minimum_cut(adjacency_matrix, derivative, considered_idxs); // TODO could pass num constrains in as calculating twice
+            minimum_cut(adjacency_matrix, derivative, considered_idxs); // TODO could pass num constraints in as calculating twice
         auto [left, right] = argpartition(solution);
 
         const bool no_cut = left.rows() == 0 || right.rows() == 0;
@@ -447,7 +450,7 @@ gir_update (
         if (no_cut) {
             group_loss(considered_idxs).array() = sentinal;
             y_fit(considered_idxs).array() = estimator;
-            return 0; // nothing changed
+            return IterationResult::unchanged;
 
         } else {
             const auto& loss_right = loss_fun.derivative(
@@ -466,11 +469,28 @@ gir_update (
 
             groups(considered_idxs(right)).array() = ++group_count;
 
-            return 1; // something changed
+            return IterationResult::improved;
         }
     }
 }
 
+/**
+ * Runs the generalised isotonic regression algorithm on the provided adjacency matrix
+ * with correspond magnitudes in `_y` and weights in `_weights`.
+ *
+ * @param `adjacency_matrix` An adjacency matrix describing a <= relationship between points.
+ *        Each entry in the row i indicates another point j such that point_i <= point_j.
+ * @param `_y` The values to which are fit, while maintaining monotonicity.
+ * @param `_weights` A weighting for each point. A larger weight means a point has a stronger
+ *        influence on the fit curve.
+ * @param `loss_fun` A function used to guide the optimisation. For example the L2 loss.
+ * @param `max_iterations` The maximum number of operations to complete before stopping. Given
+*         a value of 0 the function iterates until optimal.
+ * @return a pair containing the following:
+ *         - the grouping of points in the result. Each point i that has the same group has
+ *           an identical estimation
+ *         - the estimation for each point i
+ */
 template<typename YType, typename WeightsType, typename LossType>
 std::pair<VectorXu, Eigen::VectorXd>
 generalised_isotonic_regression (
@@ -483,15 +503,14 @@ generalised_isotonic_regression (
     Eigen::VectorXd y;
     Eigen::VectorXd weights;
 
-    // TODO test this is actually doing what I want
     if constexpr (std::is_same_v<YType, Eigen::VectorXd>) {
-        y = std::move(_y);
+        y = std::forward<YType>(_y); // TODO copy with reference
     } else {
         y = _y; // Conversion Constructor
     }
 
     if constexpr (std::is_same_v<WeightsType, Eigen::VectorXd>) {
-        weights = std::move(_weights);
+        weights = std::forward<WeightsType>(_weights);
     } else {
         weights = _weights; // Conversion Constructor
     }
@@ -509,7 +528,7 @@ generalised_isotonic_regression (
 
     // These iterations could potentially be done in parallel (except the first)
     for (uint64_t iteration = 0; max_iterations == 0 || iteration < max_iterations; ) {
-        const auto status = gir_update(
+        const IterationResult status = gir_update(
             adjacency_matrix,
             y,
             weights,
@@ -520,9 +539,9 @@ generalised_isotonic_regression (
             y_fit
         );
 
-        if (status == 1) {
+        if (status == IterationResult::improved) {
             ++iteration;
-        } else if (status == -1) {
+        } else if (status == IterationResult::optimal) {
             break;
         }
     }

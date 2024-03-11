@@ -33,11 +33,26 @@ add_link_options(
 
 include(FetchContent)
 
+function(FetchContent_MakeAvailable2 pkgs) # until cmake 3.28
+    foreach(pkg ${ARGV})
+        string(TOLOWER ${pkg} pkgLower)
+        FetchContent_GetProperties(${pkg})
+
+        if(NOT "${${pkgLower}_POPULATED}")
+            FetchContent_Populate(${pkg})
+            add_subdirectory("${${pkgLower}_SOURCE_DIR}" "${${pkgLower}_BINARY_DIR}" EXCLUDE_FROM_ALL)
+        endif()
+    endforeach()
+endfunction()
+
 FetchContent_Declare(
     Eigen3
     GIT_REPOSITORY "https://gitlab.com/libeigen/eigen"
-    GIT_TAG 3.4.0
+    # 3.4.0
+    GIT_TAG 3147391d946bb4b6c68edd901f2add6ac1f31f8c
+    # hash: sha256-1/4xMetKMDOgZgzz3WMxfHUEpmdAm52RqZvz6i0mLEw=
     GIT_SHALLOW TRUE
+    EXCLUDE_FROM_ALL
 )
 
 FetchContent_MakeAvailable(
@@ -62,10 +77,12 @@ else ()
     option(BUILD_GIR_CLI_TOOL "Build CLI Tool" OFF)
     option(BUILD_GIR_EXAMPLES "Build Examples" OFF)
     option(BUILD_GIR_TESTS    "Build Tests" OFF)
+    option(BUILD_GIR_PYTHON   "Build Python Interface" OFF)
 
     message(STATUS "Build GIR CLI Tool: ${BUILD_GIR_CLI_TOOL}")
     message(STATUS "Build GIR Examples: ${BUILD_GIR_EXAMPLES}")
     message(STATUS "Build GIR Tests: ${BUILD_GIR_TESTS}")
+    message(STATUS "Build GIR Python Interface: ${BUILD_GIR_PYTHON}")
 
     set(
         TARGET_COMPILE_OPTIONS
@@ -89,5 +106,10 @@ else ()
         message(STATUS "Building Tests")
         add_subdirectory(tests)
     endif (BUILD_GIR_TESTS)
+
+    if (BUILD_GIR_PYTHON)
+        message(STATUS "Building Python Interface")
+        add_subdirectory(python)
+    endif (BUILD_GIR_PYTHON)
 
 endif ()

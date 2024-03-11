@@ -6,18 +6,26 @@ FetchContent_Declare(
     # GIT_REPOSITORY "https://github.com/vincentlaucsb/csv-parser"
     GIT_REPOSITORY "https://github.com/ahoarau/csv-parser"
     GIT_TAG 9a83b884b5a152e6151091a3bac5c4c11873be10
+    # hash: sha256-QyY9zVzXq4a0Mgn/erVim67aIjdGf1Dy9DRySjrjojk=
     GIT_SHALLOW TRUE
+    EXCLUDE_FROM_ALL
+)
+
+FetchContent_MakeAvailable(
+    csv-parser
 )
 
 FetchContent_Declare(
     cxxopts
     GIT_REPOSITORY "https://github.com/jarro2783/cxxopts"
-    GIT_TAG v3.1.1
+    # v3.1.1
+    GIT_TAG eb787304d67ec22f7c3a184ee8b4c481d04357fd
+    # hash: sha256-lJPMaXBfrCeUhhXha5f7zmOGtyEDzU3oPTMirPTFZzQ=
     GIT_SHALLOW TRUE
+    EXCLUDE_FROM_ALL
 )
 
 FetchContent_MakeAvailable(
-    csv-parser
     cxxopts
 )
 
@@ -54,3 +62,5 @@ target_compile_options(
 )
 
 set_property(TARGET ${EXECUTABLE_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)
+
+install(TARGETS ${EXECUTABLE_NAME})

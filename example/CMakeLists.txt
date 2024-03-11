@@ -1,4 +1,4 @@
-set(EXECUTABLE_NAME main)
+set(EXECUTABLE_NAME example)
 
 add_executable(
     ${EXECUTABLE_NAME}
@@ -18,3 +18,5 @@ target_compile_options(
 )
 
 set_property(TARGET ${EXECUTABLE_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)
+
+install(TARGETS ${EXECUTABLE_NAME})

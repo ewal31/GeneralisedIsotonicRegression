@@ -1,7 +1,9 @@
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY "https://github.com/catchorg/Catch2"
-    GIT_TAG v3.4.0
+    # 3.4.0
+    GIT_TAG 6e79e682b726f524310d55dec8ddac4e9c52fb5f
+    # hash: sha256-DqGGfNjKPW9HFJrX9arFHyNYjB61uoL6NabZatTWrr0=
     GIT_SHALLOW TRUE
 )
 
@@ -29,3 +31,5 @@ target_compile_options(
 )
 
 set_property(TARGET test PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)
+
+install(TARGETS test)

@@ -118,7 +118,7 @@ and
 
 ```cpp
 std::pair<VectorXu, Eigen::VectorXd>
-generalised_isotonic_regression (
+generalised_isotonic_regression(
     const Eigen::SparseMatrix<bool>& adjacency_matrix,
     YType&& _y,
     WeightsType&& _weights,
@@ -128,6 +128,18 @@ generalised_isotonic_regression (
 ```
 
 An example can be found in [example/main.cpp](./example/main.cpp).
+
+## Python Interface
+
+Your best option is to user a local virtual environment.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/ewal31/GeneralisedIsotonicRegression
+```
+
+Then check out the [examples](./python/examples).
 
 ## Dependencies
 
@@ -145,6 +157,8 @@ An example can be found in [example/main.cpp](./example/main.cpp).
 
 ## TODO
 
+- [ ] reduce the amount of copying of data between the Cpp and Python code (in most cases can use a reference)
+- [ ] add more parameter checks in both Cpp and Python code
 - [x] rewrite loss functions code to allow for more to be added and so they can be configured
 - [x] tests for duplicate points
 - [x] more loss functions

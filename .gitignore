@@ -7,3 +7,5 @@ build/
 debug/
 webbuild/
 .emscripten/
+*.egg-info
+.venv

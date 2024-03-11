@@ -134,9 +134,11 @@ An example can be found in [example/main.cpp](./example/main.cpp).
 Your best option is to user a local virtual environment.
 
 ```bash
+git clone https://github.com/ewal31/GeneralisedIsotonicRegression
+cd GeneralisedIsotonicRegression
 python -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/ewal31/GeneralisedIsotonicRegression
+pip install .
 ```
 
 Then check out the [examples](./python/examples).

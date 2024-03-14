@@ -19,7 +19,6 @@ FetchContent_Declare(
     GIT_TAG 21da9b90e0dceeb22ef9e35e5ff2c3ab17dc5232
     # hash: sha256-Wa5ivUJk0t58FhZD0zy0zxHHj4/p8e9WcxXwu5zenxI=
     GIT_SHALLOW TRUE
-    EXCLUDE_FROM_ALL
 )
 
 FetchContent_MakeAvailable(

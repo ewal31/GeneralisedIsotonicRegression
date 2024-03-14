@@ -82,6 +82,7 @@ else ()
     message(STATUS "Build GIR CLI Tool: ${BUILD_GIR_CLI_TOOL}")
     message(STATUS "Build GIR Examples: ${BUILD_GIR_EXAMPLES}")
     message(STATUS "Build GIR Tests: ${BUILD_GIR_TESTS}")
+    message(STATUS "Build GIR Benchmarks: ${BUILD_GIR_BENCHMARKS}")
     message(STATUS "Build GIR Python Interface: ${BUILD_GIR_PYTHON}")
 
     set(
@@ -106,6 +107,11 @@ else ()
         message(STATUS "Building Tests")
         add_subdirectory(tests)
     endif (BUILD_GIR_TESTS)
+
+    if (BUILD_GIR_BENCHMARKS)
+        message(STATUS "Building Benchmarks")
+        add_subdirectory(benchmarks)
+    endif (BUILD_GIR_BENCHMARKS)
 
     if (BUILD_GIR_PYTHON)
         message(STATUS "Building Python Interface")

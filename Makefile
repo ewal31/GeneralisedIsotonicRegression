@@ -3,29 +3,38 @@ EXAMPLE_SRCS := $(wildcard example/*)
 ISO_SRCS1 := $(wildcard isotonic_regression/*)
 ISO_SRCS2 := $(wildcard isotonic_regression/*/*)
 TEST_SRCS := $(wildcard tests/*)
+BENCHMARK_SRCS := $(wildcard benchmarks/*)
 WEBASSEMBLY_SRCS := $(wildcard webassembly/*)
 
 BUILD_TYPE := Release # RelWithDebInfo
 
 build/cli/gir: CMakeLists.txt $(CLI_SRCS) $(ISO_SRCS1) $(ISO_SRCS2)
-	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=OFF -DBUILD_GIR_TESTS=OFF
+	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=OFF -DBUILD_GIR_TESTS=OFF -DBUILD_GIR_BENCHMARKS=OFF
 	make -C build
 
 cli: build/cli/gir
 
 build/example/main: CMakeLists.txt $(EXAMPLE_SRCS) $(ISO_SRCS1) $(ISO_SRCS2)
-	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=OFF -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=OFF
+	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=OFF -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=OFF -DBUILD_GIR_BENCHMARKS=OFF
 	make -C build
 
 run: build/example/main
 	./build/example/main
 
 build/tests/test: CMakeLists.txt $(TEST_SRCS) $(ISO_SRCS1) $(ISO_SRCS2)
-	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=OFF -DBUILD_GIR_EXAMPLES=OFF -DBUILD_GIR_TESTS=ON
+	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=OFF -DBUILD_GIR_EXAMPLES=OFF -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=OFF
 	make -C build
 
 test: build/tests/test
 	./build/tests/test
+
+
+build/benchmarks/gir_benchmarks: CMakeLists.txt $(BENCHMARK_SRCS) $(ISO_SRCS1) $(ISO_SRCS2)
+	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=OFF -DBUILD_GIR_EXAMPLES=OFF -DBUILD_GIR_TESTS=OFF -DBUILD_GIR_BENCHMARKS=ON
+	make -C build
+
+benchmark: build/benchmarks/gir_benchmarks
+	./build/benchmarks/gir_benchmarks
 
 webbuild/webassembly/girweb.wasm: CMakeLists.txt $(WEBASSEMBLY_SRCS) $(ISO_SRCS1) $(ISO_SRCS2)
 	$(if $(shell command -v emcmake 2> /dev/null), $(info Found `emcmake`),$(error Please obtain a copy of emsdk and source `emsdk_env.sh`))
@@ -38,14 +47,14 @@ wasm: webbuild/webassembly/girweb.wasm
 	emrun webbuild/webassembly/index.html
 
 lspsymbols:
-	cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON
+	cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=ON
 
 lspsymbolsweb:
 	$(if $(shell command -v emcmake 2> /dev/null), $(info Found `emrun`),$(error Please obtain a copy of emsdk and source `emsdk_env.sh`))
 	emcmake cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES
 
 all:
-	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON
+	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=ON
 	make -C build
 
 clean:

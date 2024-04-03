@@ -13,6 +13,7 @@ FetchContent_MakeAvailable(
 
 add_executable(
     test
+    test_dominated_sorting.cpp
     test_generalized_isotonic_regression.cpp
     test_utility.cpp
 )

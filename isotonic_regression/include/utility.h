@@ -10,6 +10,8 @@ namespace gir {
 
 using VectorXu = Eigen::VectorX<Eigen::Index>;
 
+double median(Eigen::VectorXd vals);
+
 template<typename V>
 VectorXu argsort(const Eigen::Matrix<V, Eigen::Dynamic, 1>& vec) {
     VectorXu idxs = VectorXu::LinSpaced(vec.size(), 0, vec.size() - 1);
@@ -64,5 +66,10 @@ find(Eigen::VectorX<V> vec, UnaryPredicate p) {
     idxs.conservativeResize(std::distance(idxs.begin(), partition_end));
     return idxs;
 }
+
+// TODO could implement these variants in terms of above
+// but kinda think vectorised comparison before application
+// is probably faster
+VectorXu find(const Eigen::VectorX<bool>& solution);
 
 } // namespace gir

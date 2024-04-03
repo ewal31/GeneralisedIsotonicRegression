@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utility.h"
+
 #include <Eigen/Core>
 
 #include <iostream>
@@ -9,8 +11,6 @@
 namespace gir {
 
 Eigen::VectorXd normalise(const Eigen::VectorXd& loss_derivative);
-
-double median(Eigen::VectorXd vals);
 
 template <typename T>
 int8_t sign(

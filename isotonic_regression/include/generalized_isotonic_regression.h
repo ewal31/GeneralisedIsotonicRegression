@@ -201,52 +201,12 @@ points_to_adjacency_2d(const Eigen::MatrixX<V>& points) {
 }
 
 template<typename V>
-void
-points_to_adjacency_2d_divide_and_conquer_impl(
-    const Eigen::MatrixX<V>& points,
-    VectorXu& dominated,
-    const VectorXu& idxs
-) {
-    if (idxs.rows() <= 1) {
-        return;
-    }
-
-    const double cut_val = median(points(idxs, 0));
-
-    // TODO tie break for the unlikely case that only median left
-    const auto [_smaller, _larger] = argpartition(points(idxs, 0).array() > cut_val);
-
-    const VectorXu smaller = idxs(_smaller);
-    const VectorXu larger = idxs(_larger);
-
-    points_to_adjacency_2d_divide_and_conquer_impl(points, dominated, smaller);
-    points_to_adjacency_2d_divide_and_conquer_impl(points, dominated, larger);
-
-    Eigen::Index i = 0;
-    Eigen::Index j = 0;
-    u_int64_t total = 0;
-
-    while (i < smaller.rows() && j < larger.rows()) {
-        // TODO equal values need special handling
-        if (smaller(i) <= larger(j)) {
-            ++total;
-            ++i;
-        } else if (smaller(i) > larger(j)) {
-            dominated[larger(j)] += total;
-            ++j;
-        }
-    }
-
-    while(j < larger.rows()) {
-        dominated[larger(j)] += total;
-        ++j;
-    }
-}
-
-template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency_2d_divide_and_conquer(const Eigen::MatrixX<V>& points) {
     const uint64_t total_points = points.rows();
+
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
+    adjacency.reserve(Eigen::VectorXi::Constant(total_points, 30 ? 30 < total_points : total_points));
 
     // sort by y to speed up comparison checks
     VectorXu y_sorted_idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
@@ -263,12 +223,11 @@ points_to_adjacency_2d_divide_and_conquer(const Eigen::MatrixX<V>& points) {
 
     VectorXu idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
     VectorXu dominated = VectorXu::Zero(points.rows());
+    Eigen::VectorX<bool> is_predecessor = Eigen::VectorX<bool>::Zero(total_points);
+    std::vector<Eigen::Triplet<bool>> indices;
 
-    points_to_adjacency_2d_divide_and_conquer_impl(y_sorted_points, dominated, idxs);
+    // points_to_adjacency_2d_divide_and_conquer_impl(y_sorted_points, is_predecessor, indices, dominated, idxs);
     // std::cout << "dominated:\n" << dominated << std::endl;
-
-    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
-    adjacency.reserve(Eigen::VectorXi::Constant(total_points, 30 ? 30 < total_points : total_points));
 
     // Finalise Adjacency and Point Index Mappings
     adjacency.makeCompressed();

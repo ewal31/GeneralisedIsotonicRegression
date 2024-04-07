@@ -398,6 +398,8 @@ n_d_helper_a(
     }
 }
 
+// TODO probably need to make min/max choosable by user for both
+// this function and the total dominated by/dominates above
 template<typename V>
 std::tuple<VectorXu, VectorXu, VectorXu, VectorXu> // TODO probably need to start wrapping in structs for better ida of what is returned
 non_dominated_sort(
@@ -408,6 +410,9 @@ non_dominated_sort(
     VectorXu pareto_rank = VectorXu::Zero(total_points);
     VectorXu idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
 
+    // algorithm by default tries to minimise, so we need to invert
+    // as we want the maximum
+
     // sort lexicographically
     VectorXu y_sorted_idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
     std::sort(
@@ -416,26 +421,26 @@ non_dominated_sort(
         [&points](const auto& i, const auto& j) {
             for (Eigen::Index k = 0; k < points.cols(); ++k) {
                 if (points(i, k) != points(j, k)) {
-                    return points(i, k) <= points(j, k);
+                    return points(i, k) > points(j, k);
                 }
             }
             return true;
         });
 
-    const Eigen::MatrixX<V> y_sorted_points = points(y_sorted_idxs, Eigen::all);
-    // std::cout << "y_sorted_points:\n" << y_sorted_points << std::endl;
+    const Eigen::MatrixX<V> y_sorted_points = -1 * points(y_sorted_idxs, Eigen::all);
+    std::cout << "y_sorted_points:\n" << y_sorted_points << std::endl;
 
     // deal with duplicate points afterwards
-    const auto& duplicates_start_at = std::unique( // removes all except first from each grouping of identical elements
-        idxs.begin(),
-        idxs.end(),
-        [&y_sorted_points](const auto& i, const auto& j) {
-            return y_sorted_points(i, Eigen::all) == y_sorted_points(j, Eigen::all);
-        }
-    );
+    // const auto& duplicates_start_at = std::unique( // removes all except first from each grouping of identical elements
+    //     idxs.begin(),
+    //     idxs.end(),
+    //     [&y_sorted_points](const auto& i, const auto& j) {
+    //         return y_sorted_points(i, Eigen::all) == y_sorted_points(j, Eigen::all);
+    //     }
+    // );
 
-    const Eigen::Index total_duplicates = std::distance(duplicates_start_at, idxs.end());
-    idxs.conservativeResize(total_points - total_duplicates);
+    // const Eigen::Index total_duplicates = std::distance(duplicates_start_at, idxs.end());
+    // idxs.conservativeResize(total_points - total_duplicates);
 
     // std::cout << "uniquedidxs\n" << idxs << std::endl;
     // std::cout << "adjustedidxs\n" << idxs(VectorXu::LinSpaced(total_points - total_duplicates, 0, total_points - total_duplicates - 1)) << std::endl;
@@ -449,23 +454,27 @@ non_dominated_sort(
     );
 
     // Fix duplicate values
-    for (Eigen::Index i = 1; i < total_points - total_duplicates; ++i) {
-        if (idxs(i) != idxs(i - 1) + 1) {
-            for (Eigen::Index j = idxs(i - 1) + 1; j < idxs(i); ++j) {
-                pareto_rank(j) = pareto_rank(idxs(i - 1));
-            }
-        }
-    }
+    // for (Eigen::Index i = 1; i < total_points - total_duplicates; ++i) {
+    //     if (idxs(i) != idxs(i - 1) + 1) {
+    //         for (Eigen::Index j = idxs(i - 1) + 1; j < idxs(i); ++j) {
+    //             pareto_rank(j) = pareto_rank(idxs(i - 1));
+    //         }
+    //     }
+    // }
 
-    // when the last value has duplicates
-    for (Eigen::Index j = idxs(total_points - total_duplicates - 1) + 1; j < total_points; ++j) {
-        pareto_rank(j) = pareto_rank(idxs(total_points - total_duplicates - 1));
-    }
+    // // when the last value has duplicates
+    // for (Eigen::Index j = idxs(total_points - total_duplicates - 1) + 1; j < total_points; ++j) {
+    //     pareto_rank(j) = pareto_rank(idxs(total_points - total_duplicates - 1));
+    // }
+
+    std::cout << "pareto_rank_before\n" << pareto_rank << std::endl;
+
+    gir::VectorXu idx_new = y_sorted_idxs.reverse();
 
     return std::make_tuple(
-        pareto_rank,
-        argsort(y_sorted_idxs),
-        y_sorted_idxs,
+        pareto_rank.reverse(),
+        argsort(idx_new),
+        idx_new,
         idxs
     );
 }

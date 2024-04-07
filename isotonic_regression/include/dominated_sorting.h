@@ -59,16 +59,16 @@ total_dominated_by_impl(
 
     }
 
-    std::cout << "points:\n" << points(idxs, Eigen::all) << std::endl;
-    std::cout << "cut_val: " << cut_val << std::endl;
-    std::cout << "smaller:\n" << points(smaller, Eigen::all) << std::endl;
-    std::cout << "larger:\n" << points(larger, Eigen::all) << std::endl;
-    std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" << std::endl;
+    //std::cout << "points:\n" << points(idxs, Eigen::all) << std::endl;
+    //std::cout << "cut_val: " << cut_val << std::endl;
+    //std::cout << "smaller:\n" << points(smaller, Eigen::all) << std::endl;
+    //std::cout << "larger:\n" << points(larger, Eigen::all) << std::endl;
+    //std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" << std::endl;
 
     total_dominated_by_impl(points, dominated_by, smaller);
     total_dominated_by_impl(points, dominated_by, larger);
 
-    std::cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n" << std::endl;
+    //std::cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n" << std::endl;
 
     Eigen::Index i = 0;
     Eigen::Index j = 0;
@@ -89,7 +89,7 @@ total_dominated_by_impl(
         ++j;
     }
 
-    std::cout << "dominated_by:\n" << dominated_by << std::endl;
+    //std::cout << "dominated_by:\n" << dominated_by << std::endl;
 
 }
 
@@ -123,7 +123,7 @@ total_dominated_by(
 
     const Eigen::MatrixX<V> y_sorted_points = -1 * points(y_sorted_idxs, Eigen::all).array();
 
-    std::cout << "y_sorted_points:\n" << y_sorted_points << std::endl;
+    //std::cout << "y_sorted_points:\n" << y_sorted_points << std::endl;
 
     total_dominated_by_impl(y_sorted_points, dominated_by, idxs);
 
@@ -359,19 +359,19 @@ n_d_helper_a(
     const Eigen::Index k, // 0-indexed
     VectorXu& pareto_rank
 ) {
-    std::cout << "nda: k: " << k << " and S:\n" << S << std::endl;
+    // std::cout << "nda: k: " << k << " and S:\n" << S << std::endl;
     if (S.rows() < 2) {
-        std::cout << "nda: |S| < 2" << std::endl;
+        // std::cout << "nda: |S| < 2" << std::endl;
         return;
 
     } else if (S.rows() == 2) {
-        std::cout << "nda: |S| == 2" << std::endl;
+        // std::cout << "nda: |S| == 2" << std::endl;
         if (
             (points(S(0), VectorXu::LinSpaced(k + 1, 0, k)).array() < // or <= ?
              points(S(1), VectorXu::LinSpaced(k + 1, 0, k)).array()
             ).all()
         ) {
-            std::cout << "nda: s_1:k^0 == s_1:k^1" << std::endl;
+            // std::cout << "nda: s_1:k^0 == s_1:k^1" << std::endl;
             pareto_rank(S(1)) = std::max(
                 pareto_rank(S(1)),
                 pareto_rank(S(0)) + 1
@@ -379,16 +379,16 @@ n_d_helper_a(
         }
 
     } else if (k == 1) { // so the last 2 and the first is sorted
-        std::cout << "nda: k == 1" << std::endl;
+        // std::cout << "nda: k == 1" << std::endl;
         sweep_a(points, S, pareto_rank);
 
     } else if ((points(S, k).array() == points(S(0), k)).all()) {
-        std::cout << "nda: |s_k| == 1" << std::endl;
+        // std::cout << "nda: |s_k| == 1" << std::endl;
         // all points along axis are identical, so move to next
         n_d_helper_a(points, S, k-1, pareto_rank);
 
     } else {
-        std::cout << "nda: else" << std::endl;
+        // std::cout << "nda: else" << std::endl;
 
         const auto& [L, H] = split_a(points, S, k);
         n_d_helper_a(points, L, k, pareto_rank);
@@ -399,7 +399,7 @@ n_d_helper_a(
 }
 
 template<typename V>
-std::tuple<VectorXu, VectorXu, VectorXu>
+std::tuple<VectorXu, VectorXu, VectorXu, VectorXu> // TODO probably need to start wrapping in structs for better ida of what is returned
 non_dominated_sort(
     const Eigen::MatrixX<V>& points
 ) {
@@ -423,14 +423,50 @@ non_dominated_sort(
         });
 
     const Eigen::MatrixX<V> y_sorted_points = points(y_sorted_idxs, Eigen::all);
-    std::cout << "y_sorted_points:\n" << y_sorted_points << std::endl;
+    // std::cout << "y_sorted_points:\n" << y_sorted_points << std::endl;
 
-    n_d_helper_a(y_sorted_points, idxs, y_sorted_points.cols() - 1, pareto_rank);
+    // deal with duplicate points afterwards
+    const auto& duplicates_start_at = std::unique( // removes all except first from each grouping of identical elements
+        idxs.begin(),
+        idxs.end(),
+        [&y_sorted_points](const auto& i, const auto& j) {
+            return y_sorted_points(i, Eigen::all) == y_sorted_points(j, Eigen::all);
+        }
+    );
+
+    const Eigen::Index total_duplicates = std::distance(duplicates_start_at, idxs.end());
+    idxs.conservativeResize(total_points - total_duplicates);
+
+    // std::cout << "uniquedidxs\n" << idxs << std::endl;
+    // std::cout << "adjustedidxs\n" << idxs(VectorXu::LinSpaced(total_points - total_duplicates, 0, total_points - total_duplicates - 1)) << std::endl;
+
+    n_d_helper_a(
+        y_sorted_points,
+        //idxs(VectorXu::LinSpaced(total_points - total_duplicates, 0, total_points - total_duplicates - 1)),
+        idxs,
+        y_sorted_points.cols() - 1,
+        pareto_rank
+    );
+
+    // Fix duplicate values
+    for (Eigen::Index i = 1; i < total_points - total_duplicates; ++i) {
+        if (idxs(i) != idxs(i - 1) + 1) {
+            for (Eigen::Index j = idxs(i - 1) + 1; j < idxs(i); ++j) {
+                pareto_rank(j) = pareto_rank(idxs(i - 1));
+            }
+        }
+    }
+
+    // when the last value has duplicates
+    for (Eigen::Index j = idxs(total_points - total_duplicates - 1) + 1; j < total_points; ++j) {
+        pareto_rank(j) = pareto_rank(idxs(total_points - total_duplicates - 1));
+    }
 
     return std::make_tuple(
         pareto_rank,
         argsort(y_sorted_idxs),
-        y_sorted_idxs
+        y_sorted_idxs,
+        idxs
     );
 }
 

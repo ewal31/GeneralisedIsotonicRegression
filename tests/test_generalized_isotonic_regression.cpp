@@ -306,6 +306,181 @@ TEST_CASE( "points_to_adjacency", "[isotonic_regression]" ) {
     }
 }
 
+TEST_CASE( "points_to_adjacency_dominated_sorting", "[isotonic_regression]" ) {
+    SECTION( "Equal dimension" ) {
+        Eigen::MatrixX<double> points(5, 2);
+        points << 1, 1,
+                  2, 1,
+                  3, 1,
+                  4, 1,
+                  5, 1;
+
+        /*
+         * . x . . .
+         * . . x . .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> expected_adjacency(5, 5);
+        expected_adjacency.insert(0, 1) = true;
+        expected_adjacency.insert(1, 2) = true;
+        expected_adjacency.insert(2, 3) = true;
+        expected_adjacency.insert(3, 4) = true;
+
+        auto [adjacency_matrix, idx_original, idx_new] =
+            gir::points_to_adjacency_dominated_sorting(points);
+
+        REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
+    }
+
+    SECTION( "Multiple Paths" ) {
+        Eigen::MatrixX<double> points(5, 2);
+        points << 1, 1,
+                  2, 3,
+                  3, 2,
+                  4, 4,
+                  5, 5;
+
+        /*
+         * . x x . .
+         * . . . x .
+         * . . . x .
+         * . . . . x
+         * . . . . .
+         */
+        Eigen::SparseMatrix<bool> expected_adjacency(5, 5);
+        expected_adjacency.insert(0, 1) = true;
+        expected_adjacency.insert(0, 2) = true;
+        expected_adjacency.insert(1, 3) = true;
+        expected_adjacency.insert(2, 3) = true;
+        expected_adjacency.insert(3, 4) = true;
+
+        auto [adjacency_matrix, idx_original, idx_new] =
+            gir::points_to_adjacency_dominated_sorting(points);
+
+        REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
+    }
+
+    SECTION( "Duplicate Point" ) {
+        Eigen::MatrixX<double> points(6, 2);
+        points << 1, 1,
+                  2, 3,
+                  3, 2,
+                  3, 2,
+                  4, 4,
+                  5, 5;
+
+        /*
+         * . x x x . .
+         * . . . . x .
+         * . . . x x .
+         * . . x . x .
+         * . . . . . x
+         * . . . . . .
+         */
+        Eigen::SparseMatrix<bool> expected_adjacency(6, 6);
+        expected_adjacency.insert(0, 1) = true;
+        expected_adjacency.insert(0, 2) = true;
+        expected_adjacency.insert(0, 3) = true;
+        expected_adjacency.insert(1, 4) = true;
+        expected_adjacency.insert(2, 3) = true;
+        expected_adjacency.insert(2, 4) = true;
+        expected_adjacency.insert(3, 2) = true;
+        expected_adjacency.insert(3, 4) = true;
+        expected_adjacency.insert(4, 5) = true;
+
+        auto [adjacency_matrix, idx_original, idx_new] =
+            gir::points_to_adjacency_dominated_sorting(points);
+
+        REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
+    }
+
+    SECTION( "Duplicate Point 2" ) {
+        Eigen::MatrixX<double> points(6, 2);
+        points << 1, 1,
+                  2, 3,
+                  3, 2,
+                  4, 4,
+                  5, 5,
+                  5, 5;
+
+        /*
+         * . x x . . .
+         * . . . x . .
+         * . . . x . .
+         * . . . . x x
+         * . . . . . x
+         * . . . . x .
+         */
+        Eigen::SparseMatrix<bool> expected_adjacency(6, 6);
+        expected_adjacency.insert(0, 1) = true;
+        expected_adjacency.insert(0, 2) = true;
+        expected_adjacency.insert(1, 3) = true;
+        expected_adjacency.insert(2, 3) = true;
+        expected_adjacency.insert(3, 4) = true;
+        expected_adjacency.insert(3, 5) = true;
+        expected_adjacency.insert(4, 5) = true;
+        expected_adjacency.insert(5, 4) = true;
+
+        auto [adjacency_matrix, idx_original, idx_new] =
+            gir::points_to_adjacency_dominated_sorting(points);
+
+        REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
+    }
+
+    SECTION( "Random Example" ) {
+
+        // TODO add in random shuffle
+        Eigen::MatrixX<double> points(10, 2);
+        points << 0.118816,   0.794008,
+                  0.298615,   0.362457,
+                  0.346182,   0.643438,
+                  0.351713,   0.565865,
+                  0.457662,  0.0339997,
+                  0.512422,   0.107742,
+                  0.623951,  0.0586508,
+                  0.717142,   0.963573,
+                  0.801575,    0.18501,
+                  0.981288,   0.959583;
+
+        /*
+         * . . . . . . . x . x
+         * . . x x . . . x . x
+         * . . . . . . . x . x
+         * . . . . . . . x . x
+         * . . . . . x . x x x
+         * . . . . . . . x x x
+         * . . . . . . . x x x
+         * . . . . . . . . . .
+         * . . . . . . . . . x
+         * . . . . . . . . . .
+         *
+         * simplified
+         * . . . . . . . x . x
+         * . . x x . . . . . .
+         * . . . . . . . x . x
+         * . . . . . . . x . x
+         * . . . . . x . . . .
+         * . . . . . . . x x .
+         * . . . . . . . x x .
+         * . . . . . . . . . .
+         * . . . . . . . . . x
+         * . . . . . . . . . .
+         *
+         */
+        Eigen::SparseMatrix<bool> expected_adjacency(10, 10);
+
+        auto [adjacency_matrix, idx_original, idx_new] =
+            gir::points_to_adjacency_dominated_sorting(points);
+
+        std::cout << adjacency_matrix << std::endl;
+        std::cout << points(idx_new, Eigen::all) << std::endl;
+
+        REQUIRE_EQUAL(expected_adjacency, adjacency_matrix);
+    }
+}
+
 TEST_CASE( "adjacency_to_LP_standard_form", "[isotonic_regression]" ) {
     gir::VectorXu considered_idxs(5);
     considered_idxs << 0, 1, 2, 3, 4;
@@ -1167,8 +1342,8 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
                 weights,
                 gir::L2());
 
-            REQUIRE( gir::is_monotonic(sorted_points_b, y_fit_b) );
             REQUIRE( gir::is_monotonic(adjacency_matrix_b, y_fit_b) );
+            REQUIRE( gir::is_monotonic(sorted_points_b, y_fit_b) );
 
             // 2d Specialised
             auto [adjacency_matrix_s, idx_original_s, idx_new_s] =
@@ -1183,13 +1358,32 @@ TEST_CASE( "random examples are monotonic", "[isotonic_regression]" ) {
                 weights,
                 gir::L2());
 
-            REQUIRE( gir::is_monotonic(sorted_points_s, y_fit_s) );
             REQUIRE( gir::is_monotonic(adjacency_matrix_s, y_fit_s) );
+            REQUIRE( gir::is_monotonic(sorted_points_s, y_fit_s) );
 
+            // 2d dominated sorting
+            auto [adjacency_matrix_d, idx_original_d, idx_new_d] =
+                gir::points_to_adjacency_dominated_sorting(X);
+
+            Eigen::MatrixXd sorted_points_d = X(idx_new_d, Eigen::all);
+            Eigen::VectorXd sorted_ys_d = y(idx_new_d);
+
+            auto [groups_d, y_fit_d] = generalised_isotonic_regression(
+                adjacency_matrix_d,
+                sorted_ys_d,
+                weights,
+                gir::L2());
+
+            REQUIRE( gir::is_monotonic(adjacency_matrix_d, y_fit_d) );
+            REQUIRE( gir::is_monotonic(sorted_points_d, y_fit_d) );
+
+            // Comparison
             Eigen::VectorXd reordered_y_fit_b = y_fit_b(idx_original_b, Eigen::all);
             Eigen::VectorXd reordered_y_fit_s = y_fit_s(idx_original_s, Eigen::all);
+            Eigen::VectorXd reordered_y_fit_d = y_fit_d(idx_original_d, Eigen::all);
 
             REQUIRE( ((reordered_y_fit_b.array() - reordered_y_fit_s.array()) < 1e-12).all() );
+            REQUIRE( ((reordered_y_fit_b.array() - reordered_y_fit_d.array()) < 1e-12).all() );
         }
     }
 }

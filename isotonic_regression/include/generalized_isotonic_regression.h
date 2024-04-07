@@ -6,6 +6,7 @@
 #include <tuple>
 #include <utility>
 
+#include "dominated_sorting.h"
 #include "loss.h"
 #include "utility.h"
 
@@ -202,58 +203,96 @@ points_to_adjacency_2d(const Eigen::MatrixX<V>& points) {
 
 template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
-points_to_adjacency_2d_divide_and_conquer(const Eigen::MatrixX<V>& points) {
+points_to_adjacency_dominated_sorting(const Eigen::MatrixX<V>& points) {
     const uint64_t total_points = points.rows();
 
-    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points);
     adjacency.reserve(Eigen::VectorXi::Constant(total_points, 30 ? 30 < total_points : total_points));
 
-    // sort by y to speed up comparison checks
-    VectorXu y_sorted_idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
-    std::sort(
-        y_sorted_idxs.begin(),
-        y_sorted_idxs.end(),
-        [&points](const auto& i, const auto& j) {
-            if (points(i, 1) == points(j, 1))
-                return points(i, 0) < points(j, 0);
-            return points(i, 1) < points(j, 1);
-        });
+    const auto& [ranks, idx_orig, idx_new, unique_idxs] = non_dominated_sort(points);
 
-    const Eigen::MatrixX<V> y_sorted_points = points(y_sorted_idxs, Eigen::all);
+    // std::cout << "ranks:\n" << ranks << std::endl;
+    // std::cout << "idx_orig:\n" << idx_orig << std::endl;
+    // std::cout << "idx_new:\n" << idx_new << std::endl;
 
-    VectorXu idxs = VectorXu::LinSpaced(total_points, 0, total_points - 1);
-    VectorXu dominated = VectorXu::Zero(points.rows());
+    Eigen::Index p1 = 0, p2 = 0, p3 = 0;
     Eigen::VectorX<bool> is_predecessor = Eigen::VectorX<bool>::Zero(total_points);
-    std::vector<Eigen::Triplet<bool>> indices;
 
-    // points_to_adjacency_2d_divide_and_conquer_impl(y_sorted_points, is_predecessor, indices, dominated, idxs);
-    // std::cout << "dominated:\n" << dominated << std::endl;
+    // Lets start by brute-forcing the different ranks (could do better
+    // at least in 2d)
+
+    // Find start point of next rank
+    while (p2 < total_points && ranks(p2) == ranks(p1)) ++p2;
+
+    // Find the end of the next next rank
+    p3 = p2;
+    while (p3 < total_points && ranks(p3) == ranks(p2)) ++p3;
+
+    while (p2 < total_points) {
+
+        // Go through each point in the next rank and compare with current rank
+        const auto& current_rank_idxs = VectorXu::LinSpaced(p2 - p1, p1, p2-1);
+        const auto& current_rank_points = points(idx_new(current_rank_idxs), Eigen::all).array();
+        is_predecessor.setZero();
+
+        for (Eigen::Index i = p2; i < p3; ++i) {
+            is_predecessor(current_rank_idxs) = (
+                    current_rank_points <=
+                    points(idx_new(i), Eigen::all).array()
+                ).colwise().all();
+            adjacency.col(i) = is_predecessor.sparseView();
+        }
+
+        p1 = p2;
+        p2 = p3;
+        while (p3 < total_points && ranks(p3) == ranks(p2)) ++p3;
+
+    }
+
+    // TODO would be better if we could add this in above to avoid reshuffling the
+    // columns in the matrix.
+    // Corrections for duplicate points
+    for (Eigen::Index i = 1; i < unique_idxs.rows(); ++i) {
+        if (unique_idxs(i) != unique_idxs(i - 1) + 1) {
+
+            // set last in chain to be less than first in chain
+            adjacency.insert(unique_idxs(i) - 1, unique_idxs(i-1)) = 1;
+
+            // set each equal point to be less than the next
+            // this isn't already the case from above due to equal points having
+            // identical ranks
+            for (Eigen::Index j = unique_idxs(i - 1); j < unique_idxs(i) - 1; ++j) {
+                adjacency.insert(j, j + 1) = 1;
+            }
+        }
+    }
+
+    // when the last value has duplicates
+    if (unique_idxs(unique_idxs.rows() - 1) + 1 < total_points) {
+        // set last in chain to be less than first in chain
+        adjacency.insert(total_points - 1, unique_idxs(unique_idxs.rows() - 1)) = 1;
+
+        for (Eigen::Index j = unique_idxs(unique_idxs.rows() - 1) + 1; j < total_points; ++j) {
+            adjacency.insert(j - 1, j) = 1;
+        }
+    }
 
     // Finalise Adjacency and Point Index Mappings
     adjacency.makeCompressed();
-    gir::VectorXu idx_new = gir::VectorXu::Zero(10);
 
     return std::make_tuple(
         std::move(adjacency),
-        std::move(argsort(idx_new)),
+        std::move(idx_orig),
         std::move(idx_new));
 }
 
 template<typename V>
 std::tuple<Eigen::SparseMatrix<bool>, VectorXu, VectorXu>
 points_to_adjacency_N_brute_force(const Eigen::MatrixX<V>& points) {
-    // TODO with lots of points this is a real bottleneck at O(n^2)
-    // the memory usage seems fine though.
-    // ideas:
-    // * sorted idxs along each axis then can just move to the next point
-    //   and shouldn't need to do all the n comparisons each time? (kinda like merge sort)
-    // * keep tree of linked points so can run from newest backwards and save on comparisons
-    // * it is also equivalent to finding all optimals points in a pareto optimisation problem
-    //   which just has a bad computational complexity. But can still be better than n^2
 
     const uint64_t total_points = points.rows();
     const auto& sorted_idxs = argsort(points);
-    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points); // Column Major
+    Eigen::SparseMatrix<bool, Eigen::ColMajor> adjacency(total_points, total_points);
     // Not sure what a good estimate would be.
     // Below is roughly half upperbound. maybe something like log(x)
     //adjacency.reserve(Eigen::VectorXi::LinSpaced(total_points, 0, total_points-1).array() / 2 + 1);

@@ -1,15 +1,15 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import scipy as sc
-
 import multivariate_isotonic_regression as mir
+import numpy as np
 
-width = 10
+from random import random
+
+width = 20
 
 # create some points that are roughly monotonic
 # except for same added white noise
 X = np.array([(i, j) for i in range(width) for j in range(width)])
-y = X[:, 0] // 3 + np.log(X[:, 1] + 1)
+y = 3 * ((X[:, 0] // 7) + (X[:, 1] // 4)) + 1 + 1.5 * np.random.rand(width ** 2)
 
 YY, XX = np.meshgrid(range(width), range(width))
 
@@ -39,5 +39,5 @@ ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 ax.scatter(X[:, 0], X[:, 1], y)
-ax.plot_surface(XX, YY, yhat.reshape(width, width), color = 'orange', alpha=0.2)
+ax.plot_surface(XX, YY, yhat.reshape(width, width), cmap='YlOrRd_r', alpha=0.7)
 plt.show()

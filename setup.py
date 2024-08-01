@@ -1,3 +1,6 @@
+# TODO
+import time
+
 import re
 
 import os
@@ -16,7 +19,12 @@ __lib_name__ = "multivariate_isotonic_regression"
 
 class CMakeExtension(Extension):
     def __init__(self, name: str, sourcedir: str = "") -> None:
-        super().__init__(name, sources=[])
+        super().__init__(
+            name,
+            sources=[],
+            runtime_library_dirs=["./build/lib.linux-x86_64-cpython-310"],
+            extra_objects=["./build/lib.linux-x86_64-cpython-310/libhighs.so.1.6.0"],
+        )
         self.sourcedir = os.fspath(Path(sourcedir).resolve())
 
 
@@ -45,12 +53,21 @@ class CMakeBuild(build_ext):
         if not build_temp.exists():
             build_temp.mkdir(parents=True)
 
+        # TODO
+        print("THIS PATH: ", build_temp)
+        print("THIS PATH: ", cmake_args)
+
         subprocess.run(
             ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
         )
         subprocess.run(
             ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
         )
+        subprocess.run(
+            ["cp", os.path.join(build_temp, "_deps", "highs-build", "lib", "libhighs.so.1.6.0"),
+                   os.path.join("build", "lib.linux-x86_64-cpython-310")]
+        )
+        # time.sleep(60*5)
 
 setup(
     name=__lib_name__,

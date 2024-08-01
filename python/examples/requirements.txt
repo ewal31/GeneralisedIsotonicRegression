@@ -3,7 +3,7 @@ cycler==0.12.1
 fonttools==4.49.0
 kiwisolver==1.4.5
 matplotlib==3.8.3
-multivariate_isotonic_regression
+multivariate_isotonic_regression @ git+https://github.com/ewal31/GeneralisedIsotonicRegression@4bdfd06e094e04ec42e68f563a42a4c8485fa487
 numpy==1.26.4
 packaging==24.0
 pillow==10.2.0

@@ -24,8 +24,21 @@ target_link_libraries(
     isotonic_regression
 )
 
+# target_link_libraries(
+#     ${LIBRARY_NAME}
+#     PRIVATE
+#     highs::highs
+# )
+
 target_compile_definitions(
     ${LIBRARY_NAME}
     PRIVATE
     VERSION_INFO=${EXAMPLE_VERSION_INFO}
 )
+
+# file(GET_RUNTIME_DEPENDENCIES ${LIBRARY_NAME})
+
+# add_custom_command(TARGET exe POST_BUILD
+#   COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:exe> $<TARGET_RUNTIME_DLLS:exe>
+#   COMMAND_EXPAND_LISTS
+# )

@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 
+#include <algorithm>
 #include <tuple>
 #include <utility>
 
@@ -28,7 +29,6 @@ is_monotonic(
             }
         }
     }
-
     return true;
 }
 
@@ -39,6 +39,7 @@ is_monotonic(
     const Eigen::VectorX<K>& y,
     const double tolerance = 1e-6
 ) {
+    int a = 1;
     auto sorted_idxs = argsort(points);
     Eigen::MatrixX<V> sorted_points = points(sorted_idxs, Eigen::all);
     Eigen::VectorX<V> sorted_y = y(sorted_idxs);

@@ -47,14 +47,15 @@ wasm: webbuild/webassembly/girweb.wasm
 	emrun webbuild/webassembly/index.html
 
 lspsymbols:
-	cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=ON
+	cmake . -Bdebug -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=ON
+	ln -s ./debug/compile_commands.json ./
 
 lspsymbolsweb:
 	$(if $(shell command -v emcmake 2> /dev/null), $(info Found `emrun`),$(error Please obtain a copy of emsdk and source `emsdk_env.sh`))
 	emcmake cmake -H. -Bdebug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=YES
 
 all:
-	cmake . -Bbuild -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=ON
+	cmake . -Bbuild -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DBUILD_GIR_CLI_TOOL=ON -DBUILD_GIR_EXAMPLES=ON -DBUILD_GIR_TESTS=ON -DBUILD_GIR_BENCHMARKS=ON
 	make -C build
 
 clean:

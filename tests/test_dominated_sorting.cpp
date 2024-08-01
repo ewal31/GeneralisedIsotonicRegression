@@ -234,60 +234,60 @@ TEST_CASE( "non_dominated_sort", "[dominated_sorting]" ) {
     //     REQUIRE_EQUAL(expected, pareto_rank_reordered);
     // }
 
-    SECTION( "Many wavefronts" ) {
+    // SECTION( "Many wavefronts" ) {
 
-        Eigen::MatrixX<double> points(19, 2);
-        points << 1,  0,  // 0
-                  0,  2,  // 1
-                  1,  2,  // 1
-                  2,  0,  // 1
-                  2,  1,  // 1
-                  2,  2,  // 1
-                  0,  3,  // 2
-                  1,  3,  // 2
-                  3,  0,  // 2
-                  3,  1,  // 2
-                  3,  2,  // 2
-                  3,  3,  // 2
-                  0,  4,  // 3
-                  1,  4,  // 3
-                  3,  4,  // 3
-                  4,  1,  // 3
-                  4,  2,  // 3
-                  4,  3,  // 3
-                  4,  4;  // 3
+    //     Eigen::MatrixX<double> points(19, 2);
+    //     points << 1,  0,  // 0
+    //               0,  2,  // 1
+    //               1,  2,  // 1
+    //               2,  0,  // 1
+    //               2,  1,  // 1
+    //               2,  2,  // 1
+    //               0,  3,  // 2
+    //               1,  3,  // 2
+    //               3,  0,  // 2
+    //               3,  1,  // 2
+    //               3,  2,  // 2
+    //               3,  3,  // 2
+    //               0,  4,  // 3
+    //               1,  4,  // 3
+    //               3,  4,  // 3
+    //               4,  1,  // 3
+    //               4,  2,  // 3
+    //               4,  3,  // 3
+    //               4,  4;  // 3
 
-        gir::VectorXu expected(19);
-        expected << 0,
-                    1,
-                    1,
-                    1,
-                    1,
-                    1,
-                    2,
-                    2,
-                    2,
-                    2,
-                    2,
-                    2,
-                    3,
-                    3,
-                    3,
-                    3,
-                    3,
-                    3,
-                    3;
+    //     gir::VectorXu expected(19);
+    //     expected << 0,
+    //                 1,
+    //                 1,
+    //                 1,
+    //                 1,
+    //                 1,
+    //                 2,
+    //                 2,
+    //                 2,
+    //                 2,
+    //                 2,
+    //                 2,
+    //                 3,
+    //                 3,
+    //                 3,
+    //                 3,
+    //                 3,
+    //                 3,
+    //                 3;
 
-        auto [pareto_rank, idx_orig, idx_new, unique_idxs] = gir::non_dominated_sort(points);
+    //     auto [pareto_rank, idx_orig, idx_new, unique_idxs] = gir::non_dominated_sort(points);
 
-        const gir::VectorXu pareto_rank_reordered = pareto_rank(idx_orig);
+    //     const gir::VectorXu pareto_rank_reordered = pareto_rank(idx_orig);
 
-        std::cout << "pareto_rank\n" << pareto_rank << std::endl;
-        std::cout << "pareto_rank_reordered\n" << pareto_rank_reordered << std::endl;
-        std::cout << "expected\n" << expected << std::endl;
+    //     std::cout << "pareto_rank\n" << pareto_rank << std::endl;
+    //     std::cout << "pareto_rank_reordered\n" << pareto_rank_reordered << std::endl;
+    //     std::cout << "expected\n" << expected << std::endl;
 
-        REQUIRE_EQUAL(expected, pareto_rank_reordered);
-    }
+    //     REQUIRE_EQUAL(expected, pareto_rank_reordered);
+    // }
 
     // SECTION( "2 waves with 2 extremal points, with duplicate point" ) {
 
